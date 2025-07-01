@@ -1,0 +1,74 @@
+# --- Python Virtual Environments ---
+# A good practice is to name your virtual environment 'venv' or 'myenv'
+# This covers the folder you are using.
+myenv/
+venv/
+.venv/
+env/
+ENV/
+__pypackages__/
+
+# --- Python Cache & Compiled Files ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+
+# --- Sensitive Information ---
+# CRITICAL: Never commit your .env file containing API keys
+.env
+*.env
+.env.*
+env.local
+*.env.local
+
+# --- IDE & Editor Configuration ---
+# Visual Studio Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# --- Package & Dependency Management ---
+# Wheels and eggs are build artifacts
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# --- Operating System Files ---
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Log & Temp Files ---
+*.log
+*.tmp
+*.temp
+
+# --- Testing & Coverage Reports ---
+.coverage
+.pytest_cache/
+htmlcov/
+nosetests.xml
+coverage.xml
+
+# --- Jupyter Notebook Checkpoints ---
+.ipynb_checkpoints
+
+# --- Other common files to ignore ---
+# Example: If you have local test data you don't want to commit
+local_data/
+*.csv
