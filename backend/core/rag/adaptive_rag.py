@@ -1,10 +1,12 @@
 #backend\core\rag\adaptive_rag.py
 
 from langchain_mistralai import ChatMistralAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from backend.config import settings
 mistral_model = "mistral-large-latest" 
-llm = ChatMistralAI(model=mistral_model, temperature=0, api_key=settings.MISTRAL_API_KEY)
-
+# llm = ChatMistralAI(model=mistral_model, temperature=0, api_key=settings.MISTRAL_API_KEY)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
+    
 import sys
 import sys
 from pathlib import Path
@@ -99,7 +101,7 @@ You are an expert financial data routing engine. Your primary function is to ana
 
 ### tavily 🌐
 - **Use for:** latest financial news, General web searches for broad, explanatory, or qualitative questions that don't fit other specialized APIs.
-- **Best for:** "Explain what quantitative easing is.", "What are the main ESG investing strategies?", "List out the top companines in this field"
+- **Best for:** "Explain what quantitative easing is.", "What are the main ESG investing strategies?", "List out the top companies in this field"
 
 ## Routing Heuristics (Guidelines):
 

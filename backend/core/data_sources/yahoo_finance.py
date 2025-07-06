@@ -14,7 +14,6 @@ try:
 except Exception as e:
     print(f"Warning: Gemini could not be configured. Extraction will fail. Error: {e}")
 
-# --- EXPANDED METRICS AND DATA TYPES ---
 def extract_financial_entities(query: str) -> dict:
     """
     Uses Gemini to extract all relevant financial entities from a query, including
@@ -65,8 +64,13 @@ def extract_financial_entities(query: str) -> dict:
         You are an expert financial entity and data extractor. Analyze the user's query and perform three tasks:
 
         1. **Extract Tickers**: Identify all stock tickers or company names.
-           - Expand acronyms: "FAANG" -> AAPL, AMZN, META, NFLX, GOOGL.
-           - Normalize company names: "Apple" -> AAPL.
+            **Crucially, append the correct exchange suffix for non-US stocks.** This is vital for correct data retrieval.
+                -   For Indian stocks on the National Stock Exchange, use the `.NS` suffix (e.g., "Tata Motors" -> "TATAMOTORS.NS", "Reliance" -> "RELIANCE.NS").
+                -   For London Stock Exchange, use `.L` (e.g., "BP" -> "BP.L").
+                -   For US stocks (like Apple, Microsoft), no suffix is needed.
+            -   Normalize company names to their primary ticker (e.g., "Apple" -> "AAPL").
+            -   Expand acronyms where appropriate (e.g., "FAANG" -> "META", "AMZN", "AAPL", "NFLX", "GOOGL").
+
 
         2. **Extract Metrics**: Identify specific financial metrics requested.
            - Select from: {possible_metrics}
@@ -108,6 +112,63 @@ def extract_financial_entities(query: str) -> dict:
         print(f"Error in Gemini entity extraction: {e}")
         return {"tickers": [], "metrics": [], "data_types": ["info"]}
 
+# --- HELPER FUNCTIONS FOR CURRENCY ---
+def get_currency_symbol(info):
+    """Get currency symbol from ticker info"""
+    currency_map = {
+        'USD': '$',
+        'EUR': '€',
+        'GBP': '£',
+        'JPY': '¥',
+        'INR': '₹',
+        'CAD': 'C$',
+        'AUD': 'A$',
+        'CHF': 'CHF ',
+        'CNY': '¥',
+        'HKD': 'HK$',
+        'SGD': 'S$',
+        'KRW': '₩',
+        'BRL': 'R$',
+        'MXN': '$',
+        'RUB': '₽',
+        'ZAR': 'R',
+        'SEK': 'kr',
+        'NOK': 'kr',
+        'DKK': 'kr',
+        'PLN': 'zł',
+        'CZK': 'Kč',
+        'HUF': 'Ft',
+        'ILS': '₪',
+        'TRY': '₺',
+        'THB': '฿',
+        'MYR': 'RM',
+        'IDR': 'Rp',
+        'PHP': '₱',
+        'VND': '₫',
+        'TWD': 'NT$',
+        'NZD': 'NZ$'
+    }
+    
+    # Try different currency fields
+    currency_code = info.get('financialCurrency') or info.get('currency') or 'USD'
+    return currency_map.get(currency_code, currency_code + ' ')
+
+def format_currency_value(value, currency_symbol, metric):
+    """Format currency values with appropriate currency symbol"""
+    if isinstance(value, (int, float)):
+        if metric in ['marketCap', 'enterpriseValue', 'totalRevenue', 'ebitda', 'totalCash', 'totalDebt']:
+            return f"{currency_symbol}{value:,.0f}" if value > 1000000 else f"{currency_symbol}{value:,.2f}"
+        elif metric in ['currentPrice', 'previousClose', 'open', 'dayHigh', 'dayLow', 'fiftyTwoWeekHigh', 'fiftyTwoWeekLow', 'bookValue', 'dividendRate']:
+            return f"{currency_symbol}{value:.2f}"
+        elif metric in ['dividendYield', 'profitMargins', 'operatingMargins', 'returnOnEquity', 'returnOnAssets', 'revenueGrowth', 'earningsGrowth', 'payoutRatio']:
+            return f"{value:.2%}" if abs(value) <= 1 else f"{value:.2f}%"
+        elif metric in ['volume', 'averageVolume', 'fullTimeEmployees']:
+            return f"{value:,.0f}"
+        else:
+            return f"{value:,.2f}"
+    else:
+        return str(value)
+
 # --- HELPER FUNCTIONS FOR DIFFERENT DATA TYPES ---
 def get_basic_info(ticker, metrics_to_fetch):
     """Get basic company info and metrics"""
@@ -119,6 +180,9 @@ def get_basic_info(ticker, metrics_to_fetch):
         company_name = info.get('shortName', ticker.ticker)
         result = [f"=== {company_name} ({ticker.ticker}) ==="]
         
+        # Get the proper currency symbol
+        currency_symbol = get_currency_symbol(info)
+
         # Create a mapping for better labels
         metric_labels = {
             "previousClose": "Previous Close",
@@ -166,29 +230,33 @@ def get_basic_info(ticker, metrics_to_fetch):
                 value = info.get(metric, 'N/A')
                 if value == 'N/A' or value is None:
                     continue
-                    
-                if isinstance(value, (int, float)):
-                    if metric in ['marketCap', 'enterpriseValue', 'totalRevenue', 'ebitda', 'totalCash', 'totalDebt']:
-                        value_str = f"${value:,.0f}" if value > 1000000 else f"${value:,.2f}"
-                    elif metric in ['currentPrice', 'previousClose', 'open', 'dayHigh', 'dayLow', 'fiftyTwoWeekHigh', 'fiftyTwoWeekLow', 'bookValue', 'dividendRate']:
-                        value_str = f"${value:.2f}"
-                    elif metric in ['dividendYield', 'profitMargins', 'operatingMargins', 'returnOnEquity', 'returnOnAssets', 'revenueGrowth', 'earningsGrowth', 'payoutRatio']:
-                        value_str = f"{value:.2%}" if abs(value) <= 1 else f"{value:.2f}%"
-                    elif metric in ['volume', 'averageVolume', 'fullTimeEmployees']:
-                        value_str = f"{value:,.0f}"
-                    else:
-                        value_str = f"{value:,.2f}"
-                else:
+                
+                # Format based on metric type
+                if metric in ['sector', 'industry', 'website', 'businessSummary', 'exDividendDate']:
                     value_str = str(value)
+                else:
+                    value_str = format_currency_value(value, currency_symbol, metric)
                 
                 label = metric_labels.get(metric, metric.replace('_', ' ').title())
                 result.append(f"• {label}: {value_str}")
         else:
             # Default overview
+            current_price = info.get('currentPrice', 'N/A')
+            market_cap = info.get('marketCap', 'N/A')
+            trailing_pe = info.get('trailingPE', 'N/A')
+            
+            if current_price != 'N/A':
+                result.append(f"• Current Price: {currency_symbol}{current_price}")
+            else:
+                result.append("• Current Price: N/A")
+                
+            if market_cap != 'N/A':
+                result.append(f"• Market Cap: {currency_symbol}{market_cap:,}")
+            else:
+                result.append("• Market Cap: N/A")
+                
             result.extend([
-                f"• Current Price: ${info.get('currentPrice', 'N/A')}",
-                f"• Market Cap: ${info.get('marketCap', 'N/A'):,}" if info.get('marketCap') else "• Market Cap: N/A",
-                f"• P/E Ratio: {info.get('trailingPE', 'N/A')}",
+                f"• P/E Ratio: {trailing_pe}",
                 f"• Sector: {info.get('sector', 'N/A')}",
                 f"• Industry: {info.get('industry', 'N/A')}"
             ])
@@ -204,16 +272,20 @@ def get_price_history(ticker, period="1mo"):
         if hist.empty:
             return "No historical data available."
         
+        # Get currency symbol from ticker info
+        info = ticker.info
+        currency_symbol = get_currency_symbol(info)
+        
         latest = hist.iloc[-1]
         first = hist.iloc[0]
         change = ((latest['Close'] - first['Close']) / first['Close']) * 100
         
         result = [f"=== Price History ({period}) ==="]
-        result.append(f"• Start Price: ${first['Close']:.2f}")
-        result.append(f"• End Price: ${latest['Close']:.2f}")
+        result.append(f"• Start Price: {currency_symbol}{first['Close']:.2f}")
+        result.append(f"• End Price: {currency_symbol}{latest['Close']:.2f}")
         result.append(f"• Change: {change:+.2f}%")
-        result.append(f"• High: ${hist['High'].max():.2f}")
-        result.append(f"• Low: ${hist['Low'].min():.2f}")
+        result.append(f"• High: {currency_symbol}{hist['High'].max():.2f}")
+        result.append(f"• Low: {currency_symbol}{hist['Low'].min():.2f}")
         result.append(f"• Avg Volume: {hist['Volume'].mean():,.0f}")
         
         return "\n".join(result)
@@ -261,6 +333,10 @@ def get_financials(ticker, statement_type="financials"):
         if data.empty:
             return f"No {title.lower()} data available."
         
+        # Get currency symbol from ticker info
+        info = ticker.info
+        currency_symbol = get_currency_symbol(info)
+        
         result = [f"=== {title} (Most Recent Year) ==="]
         
         # Get the most recent column (year)
@@ -270,7 +346,7 @@ def get_financials(ticker, statement_type="financials"):
         # Show top 10 items
         for idx, (item, value) in enumerate(latest_data.head(10).items()):
             if pd.notna(value):
-                value_str = f"${value:,.0f}" if abs(value) > 1000 else f"${value:,.2f}"
+                value_str = f"{currency_symbol}{value:,.0f}" if abs(value) > 1000 else f"{currency_symbol}{value:,.2f}"
                 result.append(f"• {item}: {value_str}")
         
         return "\n".join(result)
@@ -283,6 +359,10 @@ def get_earnings_info(ticker):
         calendar = ticker.calendar
         earnings = ticker.earnings
         
+        # Get currency symbol from ticker info
+        info = ticker.info
+        currency_symbol = get_currency_symbol(info)
+        
         result = [f"=== Earnings Information ==="]
         
         if calendar is not None and not calendar.empty:
@@ -293,8 +373,8 @@ def get_earnings_info(ticker):
             latest_year = earnings.index[-1]
             latest_earnings = earnings.loc[latest_year, 'Earnings']
             latest_revenue = earnings.loc[latest_year, 'Revenue']
-            result.append(f"• Latest Earnings ({latest_year}): ${latest_earnings:.2f}")
-            result.append(f"• Latest Revenue ({latest_year}): ${latest_revenue:,.0f}")
+            result.append(f"• Latest Earnings ({latest_year}): {currency_symbol}{latest_earnings:.2f}")
+            result.append(f"• Latest Revenue ({latest_year}): {currency_symbol}{latest_revenue:,.0f}")
         
         return "\n".join(result) if len(result) > 1 else "No earnings information available."
     except Exception as e:

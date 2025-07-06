@@ -5,8 +5,11 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.config import settings
 from langchain_mistralai import ChatMistralAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-llm = ChatMistralAI(model="mistral-large-latest", temperature=0, api_key=settings.MISTRAL_API_KEY)
+# llm = ChatMistralAI(model="mistral-large-latest", temperature=0, api_key=settings.MISTRAL_API_KEY)
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0, api_key=settings.GOOGLE_API_KEY)
+    
 
 class FactCheckResult(BaseModel):
     """Results of cross-verifying financial data"""

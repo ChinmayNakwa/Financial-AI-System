@@ -1,215 +1,186 @@
 # backend/core/data_sources/polygon.py
 
+from backend.config import settings
+from backend.core.data_sources.yahoo_finance import extract_financial_entities  # Reuse your smart ticker finder
 import pandas as pd
 import pandas_ta as ta
 from polygon import RESTClient
-from datetime import date, timedelta
-from backend.config import settings
-import google.generativeai as genai
 import json
+from datetime import datetime, timedelta
 
-# Configure the Gemini client
-try:
-    genai.configure(api_key=settings.GOOGLE_API_KEY)
-except Exception as e:
-    print(f"Warning: Gemini could not be configured. Extraction will fail. Error: {e}")
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
+from typing import List, Optional
 
-def extract_financial_entities(query: str) -> dict:
-    """
-    Uses Gemini to extract all relevant financial entities from a query, including
-    tickers, metrics, and data types specifically for Polygon.io API capabilities.
+# --- Pydantic Model for Structured LLM Output ---
+class IndicatorRequest(BaseModel):
+    indicator_name: str = Field(description="The name of the indicator, e.g., 'sma', 'ema', 'rsi', 'macd'.")
+    window: Optional[int] = Field(default=None, description="The time window or period for the indicator, e.g., 50 for a 50-day moving average.")
+
+# --- Initialize APIs ---
+polygon_client = RESTClient(api_key=settings.POLYGON_API_KEY)
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=settings.GOOGLE_API_KEY, temperature=0)
+
+# --- Create a Structured LLM Chain for Parsing ---
+parser = JsonOutputParser(pydantic_object=IndicatorRequest)
+indicator_prompt = ChatPromptTemplate.from_template(
+    """You are an expert at parsing financial queries for technical indicators.
+    From the user's query, extract the specific indicator and its time window.
+
+    - "moving average" or "SMA" should map to "sma".
+    - "exponential moving average" or "EMA" should map to "ema".
+    - "RSI" should map to "rsi".
+    - "MACD" should map to "macd".
     
-    Returns a dictionary: {"tickers": ["..."], "metrics": ["..."], "data_types": ["..."]}
+    Default windows:
+    - sma/ema: 50
+    - rsi: 14
+    - macd: standard (12, 26, 9) - window can be null.
+
+    User Query: "{query}"
+
+    {format_instructions}
     """
-    if not settings.GOOGLE_API_KEY:
-        return {"tickers": [], "metrics": [], "data_types": ["aggregates"]}
-        
-    try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        
-        # Polygon.io specific metrics and data types
-        polygon_metrics = [
-            # OHLCV data
-            "open", "high", "low", "close", "volume", "vwap",
-            
-            # Technical indicators (calculated from OHLCV)
-            "rsi", "macd", "sma", "ema", "bollinger_bands", "stochastic",
-            "atr", "adx", "cci", "williams_r", "momentum", "roc",
-            
-            # Market data
-            "price", "daily_change", "percent_change", "trading_volume",
-            "market_cap", "shares_outstanding",
-            
-            # Options data (if available)
-            "implied_volatility", "delta", "gamma", "theta", "vega",
-            
-            # Forex specific (if currency pairs)
-            "bid", "ask", "spread", "exchange_rate"
-        ]
-        
-        # Polygon.io data types
-        polygon_data_types = [
-            "aggregates",      # Historical OHLCV data (bars)
-            "trades",          # Individual trade data
-            "quotes",          # Bid/ask quote data
-            "ticker_details",  # Company information
-            "ticker_news",     # News articles
-            "market_status",   # Market open/close status
-            "splits",          # Stock splits
-            "dividends",       # Dividend payments
-            "financials",      # Financial statements
-            "options_chain",   # Options contracts
-            "crypto",          # Cryptocurrency data
-            "forex",           # Foreign exchange data
-            "indices",         # Market indices
-            "snapshots"        # Real-time market snapshots
-        ]
+).partial(format_instructions=parser.get_format_instructions())
 
-        prompt = f"""
-        You are an expert financial entity and data extractor specialized in Polygon.io API capabilities. 
-        Analyze the user's query and perform three tasks:
+indicator_chain = indicator_prompt | llm | parser
 
-        1. **Extract Tickers**: Identify all stock tickers, crypto symbols, or forex pairs.
-           - Stock tickers: "AAPL", "TSLA", "MSFT"
-           - Crypto: "BTC", "ETH", "X:BTCUSD" (use X: prefix for crypto pairs)
-           - Forex: "C:EURUSD", "C:GBPUSD" (use C: prefix for currency pairs)
-           - Expand groups: "FAANG" -> ["AAPL", "AMZN", "META", "NFLX", "GOOGL"]
-           - Normalize company names: "Apple" -> "AAPL"
-
-        2. **Extract Metrics**: Identify specific financial metrics or technical indicators.
-           - Select from: {polygon_metrics}
-           - Map natural language: "moving average" -> "sma", "relative strength" -> "rsi"
-           - Default if none specified: ["close", "volume"]
-
-        3. **Extract Data Types**: Determine what type of Polygon.io data is needed.
-           - Select from: {polygon_data_types}
-           - "aggregates" for price/volume history and technical analysis
-           - "ticker_news" for company news
-           - "ticker_details" for company information
-           - "trades" for detailed trade data
-           - "quotes" for bid/ask data
-           - "snapshots" for real-time data
-           - Default: ["aggregates"]
-
-        **Return as valid JSON: {{"tickers": ["..."], "metrics": ["..."], "data_types": ["..."]}}**
-
-        **Examples:**
-        - "Apple stock RSI" -> {{"tickers": ["AAPL"], "metrics": ["rsi"], "data_types": ["aggregates"]}}
-        - "Tesla news and price" -> {{"tickers": ["TSLA"], "metrics": ["close"], "data_types": ["aggregates", "ticker_news"]}}
-        - "Bitcoin price history" -> {{"tickers": ["X:BTCUSD"], "metrics": ["close", "volume"], "data_types": ["aggregates"]}}
-        - "EUR/USD forex rates" -> {{"tickers": ["C:EURUSD"], "metrics": ["close"], "data_types": ["aggregates"]}}
-        - "Microsoft technical indicators" -> {{"tickers": ["MSFT"], "metrics": ["rsi", "macd", "sma"], "data_types": ["aggregates"]}}
-        - "NVDA real-time quotes" -> {{"tickers": ["NVDA"], "metrics": ["bid", "ask"], "data_types": ["snapshots", "quotes"]}}
-        - "Apple company info and dividends" -> {{"tickers": ["AAPL"], "metrics": [], "data_types": ["ticker_details", "dividends"]}}
-
-        **User Query:** "{query}"
-        """
-        
-        response = model.generate_content(prompt)
-        cleaned_response = response.text.strip().replace("```json\n", "").replace("```", "")
-        entities = json.loads(cleaned_response)
-        
-        # Validation and defaults
-        if "tickers" not in entities:
-            entities["tickers"] = []
-        if "metrics" not in entities:
-            entities["metrics"] = []
-        if "data_types" not in entities:
-            entities["data_types"] = ["aggregates"]
-            
-        # Validate tickers format for Polygon.io
-        validated_tickers = []
-        for ticker in entities["tickers"]:
-            # Ensure proper prefixes for crypto and forex
-            if any(crypto in ticker.upper() for crypto in ["BTC", "ETH", "LTC", "ADA", "DOT"]) and not ticker.startswith("X:"):
-                if len(ticker) <= 4:  # Likely a crypto symbol
-                    validated_tickers.append(f"X:{ticker.upper()}USD")
-                else:
-                    validated_tickers.append(ticker.upper())
-            elif any(forex in ticker.upper() for forex in ["USD", "EUR", "GBP", "JPY", "CAD"]) and not ticker.startswith("C:"):
-                if len(ticker) == 6:  # Likely a forex pair like EURUSD
-                    validated_tickers.append(f"C:{ticker.upper()}")
-                else:
-                    validated_tickers.append(ticker.upper())
-            else:
-                validated_tickers.append(ticker.upper())
-        
-        entities["tickers"] = validated_tickers
-
-        return entities
-
-    except Exception as e:
-        print(f"Error in Gemini entity extraction for Polygon.io: {e}")
-        return {"tickers": [], "metrics": [], "data_types": ["aggregates"]}
-
-# Initialize the Polygon client
-try:
-    client = RESTClient(api_key=settings.POLYGON_API_KEY)
-except Exception as e:
-    print(f"Warning: Polygon.io client could not be initialized. Error: {e}")
-    client = None
-
+# --- Main Tool Function ---
 def get_technical_indicators(query: str) -> str:
     """
-    Fetches historical stock data from Polygon.io and calculates technical indicators (RSI, MACD)
-    for all tickers identified in the query by the central AI extractor.
+    Calculates a specific technical indicator (like SMA, EMA, RSI, MACD) for a stock ticker
+    based on the user's query.
     """
-    if not client:
-        return "Polygon.io client is not configured. Please check your API key."
-
-    # 2. Use the central extractor to get the tickers
-    entities = extract_financial_entities(query)
-    ticker_symbols = entities.get("tickers", [])
+    ticker_info = extract_financial_entities(query)
+    if not ticker_info or not ticker_info.get('tickers'):
+        return "Could not identify a stock ticker for technical analysis."
     
-    if not ticker_symbols:
-        return "Could not identify any specific stock tickers for technical analysis."
+    # Extract the first ticker from the list
+    ticker = ticker_info['tickers'][0]
+    print(f"[Polygon.io] Identified ticker: {ticker}")
 
-    print(f"[Polygon.io] Identified tickers: {ticker_symbols}")
+    try:
+        # Use the LLM to parse the specific indicator request
+        request = indicator_chain.invoke({"query": query})
+        indicator_name = request.get('indicator_name', 'sma')
+        window = request.get('window')
 
-    # Define the date range for fetching data
-    today = date.today()
-    start_date = today - timedelta(days=100)
+        print(f"[Polygon.io] Parsed request: indicator='{indicator_name}', window={window}")
 
-    all_summaries = []
-    # 3. Loop through each identified ticker
-    for ticker in ticker_symbols:
-        try:
-            aggs = client.get_aggs(
-                ticker=ticker,
-                multiplier=1,
-                timespan="day",
-                from_=start_date.strftime("%Y-%m-%d"),
-                to=today.strftime("%Y-%m-%d"),
-            )
+        # Calculate date range (get enough historical data for indicators)
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=365)  # Get 1 year of data
+        
+        # Format dates for Polygon API (YYYY-MM-DD format)
+        from_date = start_date.strftime('%Y-%m-%d')
+        to_date = end_date.strftime('%Y-%m-%d')
+
+        # Fetch historical data to calculate the indicator
+        agg_bars = polygon_client.get_aggs(
+            ticker=ticker,
+            multiplier=1,
+            timespan="day",
+            from_=from_date,
+            to=to_date  # Fixed: removed underscore, use 'to' instead of 'to_'
+        )
+        
+        if not agg_bars:
+            return f"No historical data found for {ticker} on Polygon.io."
+
+        # Convert to DataFrame
+        df = pd.DataFrame([{
+            'time': bar.timestamp,
+            'open': bar.open,
+            'high': bar.high,
+            'low': bar.low,
+            'close': bar.close,
+            'volume': bar.volume
+        } for bar in agg_bars])
+        
+        if df.empty:
+            return f"No historical data available for {ticker}."
+        
+        df['time'] = pd.to_datetime(df['time'], unit='ms')
+        df.set_index('time', inplace=True)
+        df.sort_index(inplace=True)
+        
+        # Get current price for context
+        current_price = df['close'].iloc[-1]
+        
+        # Use pandas_ta to calculate the requested indicator
+        if indicator_name == 'sma':
+            window = window or 50  # Default to 50 if not specified
+            df.ta.sma(length=window, append=True)
+            indicator_col = f'SMA_{window}'
             
-            if not aggs:
-                all_summaries.append(f"No historical data found for {ticker} on Polygon.io.")
-                continue
-
-            df = pd.DataFrame(aggs)
-            df['date'] = pd.to_datetime(df['timestamp'], unit='ms')
-            df.set_index('date', inplace=True)
-
-            if df.empty:
-                all_summaries.append(f"Could not process historical data for {ticker}.")
-                continue
-
-            # Calculate technical indicators
-            df.ta.rsi(length=14, append=True)
-            df.ta.macd(fast=12, slow=26, signal=9, append=True)
+            if indicator_col not in df.columns:
+                return f"Unable to calculate SMA for {ticker}. Not enough data points."
             
-            latest_rsi = df['RSI_14'].iloc[-1]
-            latest_macd = df['MACD_12_26_9'].iloc[-1]
+            latest_value = df[indicator_col].iloc[-1]
+            if pd.isna(latest_value):
+                return f"Unable to calculate {window}-day SMA for {ticker}. Not enough historical data."
             
-            summary = (
-                f"Polygon.io Technical Indicators for {ticker}:\n"
-                f"- RSI (14-day): {latest_rsi:.2f}\n"
-                f"- MACD (12, 26, 9): {latest_macd:.2f}"
-            )
-            all_summaries.append(summary)
+            return f"Polygon.io Data for {ticker}:\n- Current Price: ${current_price:.2f}\n- Simple Moving Average ({window}-day): ${latest_value:.2f}"
 
-        except Exception as e:
-            all_summaries.append(f"Error processing technical indicators for {ticker} with Polygon.io: {e}")
+        elif indicator_name == 'ema':
+            window = window or 50  # Default to 50 if not specified
+            df.ta.ema(length=window, append=True)
+            indicator_col = f'EMA_{window}'
+            
+            if indicator_col not in df.columns:
+                return f"Unable to calculate EMA for {ticker}. Not enough data points."
+            
+            latest_value = df[indicator_col].iloc[-1]
+            if pd.isna(latest_value):
+                return f"Unable to calculate {window}-day EMA for {ticker}. Not enough historical data."
+            
+            return f"Polygon.io Data for {ticker}:\n- Current Price: ${current_price:.2f}\n- Exponential Moving Average ({window}-day): ${latest_value:.2f}"
 
-    # 4. Aggregate the results
-    return "\n\n---\n\n".join(all_summaries)
+        elif indicator_name == 'rsi':
+            window = window or 14  # Default to 14
+            df.ta.rsi(length=window, append=True)
+            indicator_col = f'RSI_{window}'
+            
+            if indicator_col not in df.columns:
+                return f"Unable to calculate RSI for {ticker}. Not enough data points."
+            
+            latest_value = df[indicator_col].iloc[-1]
+            if pd.isna(latest_value):
+                return f"Unable to calculate {window}-day RSI for {ticker}. Not enough historical data."
+            
+            # RSI interpretation
+            rsi_signal = "Overbought" if latest_value > 70 else "Oversold" if latest_value < 30 else "Neutral"
+            
+            return f"Polygon.io Data for {ticker}:\n- Current Price: ${current_price:.2f}\n- RSI ({window}-day): {latest_value:.2f} ({rsi_signal})"
+            
+        elif indicator_name == 'macd':
+            df.ta.macd(append=True)
+            # MACD results in multiple columns
+            macd_col = 'MACD_12_26_9'
+            signal_col = 'MACDs_12_26_9'
+            histogram_col = 'MACDh_12_26_9'
+            
+            if macd_col not in df.columns:
+                return f"Unable to calculate MACD for {ticker}. Not enough data points."
+            
+            latest_macd_line = df[macd_col].iloc[-1]
+            latest_signal_line = df[signal_col].iloc[-1]
+            latest_histogram = df[histogram_col].iloc[-1]
+            
+            if pd.isna(latest_macd_line) or pd.isna(latest_signal_line):
+                return f"Unable to calculate MACD for {ticker}. Not enough historical data."
+            
+            # MACD signal interpretation
+            macd_signal = "Bullish" if latest_macd_line > latest_signal_line else "Bearish"
+            
+            return f"Polygon.io Data for {ticker}:\n- Current Price: ${current_price:.2f}\n- MACD (12, 26, 9): {latest_macd_line:.4f}\n- Signal Line: {latest_signal_line:.4f}\n- Histogram: {latest_histogram:.4f}\n- Signal: {macd_signal}"
+
+        else:
+            return f"The requested indicator '{indicator_name}' is not supported. Available indicators: SMA, EMA, RSI, MACD."
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return f"An error occurred while getting technical indicators for {ticker}: {str(e)}"
