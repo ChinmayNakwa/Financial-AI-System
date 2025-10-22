@@ -72,3 +72,6 @@ coverage.xml
 # Example: If you have local test data you don't want to commit
 local_data/
 *.csv
+
+.langgraph_api/
+langgraph.json

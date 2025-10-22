@@ -37,4 +37,8 @@ class Settings(BaseSettings):
         env="SEC_USER_AGENT"
     )
 
+    KITE_API_KEY = "TEMP_KEY"
+    KITE_API_TOKEN = "TEMP_TOKEN"
+    KITE_API_SECRET = "TEMP_SECRET"
+
 settings = Settings()
