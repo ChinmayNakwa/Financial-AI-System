@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const promptCards = document.querySelectorAll('.prompt-card');
 
     // const API_URL = 'http://127.0.0.1:8000/query';
-    const API_URL = '/backend';
+    const API_URL = '/backend/query';
     let chatHistory = [];
 
     // Auto-resize textarea

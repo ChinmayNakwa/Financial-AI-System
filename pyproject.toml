@@ -1,0 +1,36 @@
+[project]
+name = "Financial-AI-System"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "ChinmayNakwa", email = "chinmaynakwa29012005@gmail.com"},
+]
+dependencies = [
+    "yahoo-finance",
+    "newsapi-python",
+    "alpha-vantage",
+    "fredapi",
+    "yfinance",
+    "sec-api",
+    "langchain",
+    "langchain-mistralai",
+    "langgraph",
+    "google-generativeai",
+    "pydantic",
+    "pydantic-settings",
+    "dotenv",
+    "typing",
+    "setuptools",
+    "pandas-ta",
+    "langchain-google-genai",
+    "fastapi",
+    "uvicorn",
+    "langgraph-cli[inmem]",
+]
+requires-python = "==3.12.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false
