@@ -34,7 +34,7 @@ class QueryResponse(BaseModel):
     answer: str
 
 
-@app.post("/query", response_model=QueryResponse)
+@app.post("/backend/query", response_model=QueryResponse)
 async def handle_query(request: QueryRequest):
     try:
         print(f"🚀 Received API query: '{request.query}'")
@@ -47,6 +47,6 @@ async def handle_query(request: QueryRequest):
         print(f"🚨 An error occurred in the API: {e}")
         raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
 
-@app.get("/", include_in_schema=False)
+@app.get("/backend/", include_in_schema=False)
 def root():
     return {"message": "Financial RAG API is running. Go to /docs for the API documentation."}
