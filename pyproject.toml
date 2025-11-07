@@ -5,29 +5,7 @@ description = "Default template for PDM package"
 authors = [
     {name = "ChinmayNakwa", email = "chinmaynakwa29012005@gmail.com"},
 ]
-dependencies = [
-    "yahoo-finance",
-    "newsapi-python",
-    "fredapi",
-    "yfinance",
-    "sec-api",
-    "langchain",
-    "langchain-mistralai",
-    "langgraph",
-    "google-generativeai",
-    "pydantic",
-    "pydantic-settings",
-    "dotenv",
-    "typing",
-    "setuptools",
-    "langchain-google-genai",
-    "fastapi",
-    "uvicorn",
-]
+
 requires-python = "==3.12.*"
 readme = "README.md"
 license = {text = "MIT"}
-
-
-[tool.pdm]
-distribution = false

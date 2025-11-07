@@ -1,4 +1,4 @@
-yahoo-finance
+# yahoo-finance
 newsapi-python
 # alpha-vantage
 fredapi
@@ -6,7 +6,7 @@ yfinance
 sec_api
 
 langchain
-langchain-mistralai 
+# langchain-mistralai 
 langgraph
 google.generativeai
 
