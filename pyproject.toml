@@ -8,7 +8,6 @@ authors = [
 dependencies = [
     "yahoo-finance",
     "newsapi-python",
-    "alpha-vantage",
     "fredapi",
     "yfinance",
     "sec-api",
@@ -21,11 +20,9 @@ dependencies = [
     "dotenv",
     "typing",
     "setuptools",
-    "pandas-ta",
     "langchain-google-genai",
     "fastapi",
     "uvicorn",
-    "langgraph-cli[inmem]",
 ]
 requires-python = "==3.12.*"
 readme = "README.md"

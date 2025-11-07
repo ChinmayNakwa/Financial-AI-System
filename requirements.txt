@@ -1,6 +1,6 @@
 yahoo-finance
 newsapi-python
-alpha-vantage
+# alpha-vantage
 fredapi
 yfinance
 sec_api
@@ -21,4 +21,4 @@ langchain_google_genai
 fastapi
 uvicorn
 
-langgraph-cli[inmem]
+# langgraph-cli[inmem]
