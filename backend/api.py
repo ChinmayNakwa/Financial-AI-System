@@ -4,7 +4,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware 
 
-# --- CORRECTED ABSOLUTE IMPORT ---
 from backend.core.rag.financial_workflow import app as financial_rag_app
 
 origins = [
