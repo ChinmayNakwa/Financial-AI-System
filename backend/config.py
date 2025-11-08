@@ -23,9 +23,9 @@ load_dotenv(dotenv_path=dotenv_path)
 
 class Settings(BaseSettings):
     # API Keys
-    MISTRAL_API_KEY: str = Field(..., env="MISTRAL_API_KEY")
+    # MISTRAL_API_KEY: str = Field(..., env="MISTRAL_API_KEY")
     GOOGLE_API_KEY: str = Field(..., env="GOOGLE_API_KEY")
-    ALPHA_VANTAGE_API_KEY: str = Field(..., env="ALPHA_VANTAGE_API_KEY")
+    # ALPHA_VANTAGE_API_KEY: str = Field(..., env="ALPHA_VANTAGE_API_KEY")
     FRED_API_KEY: str = Field(..., env="FRED_API_KEY")
     TAVILY_API_KEY: str = Field(..., env="TAVILY_API_KEY")
     NEWS_API_KEY: str = Field(..., env="NEWS_API_KEY")
