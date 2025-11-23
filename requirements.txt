@@ -4,7 +4,7 @@ newsapi-python
 fredapi
 yfinance
 sec_api
-polygon
+polygon-api-client>=1.14.0
 
 langchain
 # langchain-mistralai 
