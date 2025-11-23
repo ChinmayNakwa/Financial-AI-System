@@ -1,95 +1,135 @@
-# backend/core/data_sources/polygon.py
-
 from backend.config import settings
-from backend.core.data_sources.yahoo_finance import extract_financial_entities  # Reuse your smart ticker finder
+from backend.core.data_sources.yahoo_finance import extract_financial_entities
 import pandas as pd
-# import pandas_ta as ta
-from polygon import RESTClient
-import json
+import numpy as np
 from datetime import datetime, timedelta
+from typing import Optional
+import re
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
-from typing import List, Optional
 
-# --- Pydantic Model for Structured LLM Output ---
+try:
+    from polygon import RESTClient
+except (ImportError, AttributeError):
+    import polygon
+    RESTClient = polygon.RESTClient
+
 class IndicatorRequest(BaseModel):
     indicator_name: str = Field(description="The name of the indicator, e.g., 'sma', 'ema', 'rsi', 'macd'.")
-    window: Optional[int] = Field(default=None, description="The time window or period for the indicator, e.g., 50 for a 50-day moving average.")
+    window: Optional[int] = Field(default=None, description="The time window or period for the indicator.")
 
-# --- Initialize APIs ---
 polygon_client = RESTClient(api_key=settings.POLYGON_API_KEY)
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=settings.GOOGLE_API_KEY, temperature=0)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=settings.GOOGLE_API_KEY, temperature=0)
 
-# --- Create a Structured LLM Chain for Parsing ---
 parser = JsonOutputParser(pydantic_object=IndicatorRequest)
 indicator_prompt = ChatPromptTemplate.from_template(
-    """You are an expert at parsing financial queries for technical indicators.
-    From the user's query, extract the specific indicator and its time window.
-
-    - "moving average" or "SMA" should map to "sma".
-    - "exponential moving average" or "EMA" should map to "ema".
-    - "RSI" should map to "rsi".
-    - "MACD" should map to "macd".
+    """Extract the indicator and window from the query.
+    - "moving average" or "SMA" -> "sma"
+    - "exponential moving average" or "EMA" -> "ema"
+    - "RSI" -> "rsi"
+    - "MACD" -> "macd"
     
-    Default windows:
-    - sma/ema: 50
-    - rsi: 14
-    - macd: standard (12, 26, 9) - window can be null.
-
-    User Query: "{query}"
-
+    Defaults: sma/ema: 50, rsi: 14, macd: null
+    Query: "{query}"
     {format_instructions}
     """
 ).partial(format_instructions=parser.get_format_instructions())
 
 indicator_chain = indicator_prompt | llm | parser
 
-# --- Main Tool Function ---
-def get_technical_indicators(query: str) -> str:
-    """
-    Calculates a specific technical indicator (like SMA, EMA, RSI, MACD) for a stock ticker
-    based on the user's query.
-    """
-    ticker_info = extract_financial_entities(query)
-    if not ticker_info or not ticker_info.get('tickers'):
-        return "Could not identify a stock ticker for technical analysis."
+def extract_ticker_fallback(query: str) -> Optional[str]:
+    ticker_map = {
+        'apple': 'AAPL', 'microsoft': 'MSFT', 'google': 'GOOGL', 
+        'alphabet': 'GOOGL', 'amazon': 'AMZN', 'tesla': 'TSLA',
+        'meta': 'META', 'facebook': 'META', 'nvidia': 'NVDA',
+        'netflix': 'NFLX', 'amd': 'AMD', 'intel': 'INTC'
+    }
     
-    # Extract the first ticker from the list
-    ticker = ticker_info['tickers'][0]
-    print(f"[Polygon.io] Identified ticker: {ticker}")
+    query_lower = query.lower()
+    for key, ticker in ticker_map.items():
+        if key in query_lower:
+            return ticker
+    
+    matches = re.findall(r'\b([A-Z]{1,5})\b', query)
+    return matches[0] if matches else None
+
+def calculate_sma(data, window):
+    return data.rolling(window=window).mean()
+
+def calculate_ema(data, window):
+    return data.ewm(span=window, adjust=False).mean()
+
+def calculate_rsi(data, window=14):
+    delta = data.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
+    rs = gain / loss.replace(0, np.nan)
+    return 100 - (100 / (1 + rs))
+
+def calculate_macd(data, fast=12, slow=26, signal=9):
+    ema_fast = data.ewm(span=fast, adjust=False).mean()
+    ema_slow = data.ewm(span=slow, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    histogram = macd_line - signal_line
+    return macd_line, signal_line, histogram
+
+def get_technical_indicators(query: str) -> str:
+    ticker = None
+    try:
+        ticker_info = extract_financial_entities(query)
+        if ticker_info and ticker_info.get('tickers'):
+            ticker = ticker_info['tickers'][0]
+    except Exception as e:
+        print(f"[Polygon.io] LLM extraction failed: {e}")
+    
+    if not ticker:
+        ticker = extract_ticker_fallback(query)
+        if not ticker:
+            return "Could not identify a stock ticker. Please specify a company name or ticker symbol."
+    
+    print(f"[Polygon.io] Using ticker: {ticker}")
 
     try:
-        # Use the LLM to parse the specific indicator request
-        request = indicator_chain.invoke({"query": query})
-        indicator_name = request.get('indicator_name', 'sma')
-        window = request.get('window')
+        try:
+            request = indicator_chain.invoke({"query": query})
+            indicator_name = request.get('indicator_name', 'sma')
+            window = request.get('window')
+        except Exception as e:
+            print(f"[Polygon.io] LLM parsing failed: {e}")
+            query_lower = query.lower()
+            if 'rsi' in query_lower:
+                indicator_name, window = 'rsi', 14
+            elif 'macd' in query_lower:
+                indicator_name, window = 'macd', None
+            elif 'ema' in query_lower or 'exponential' in query_lower:
+                indicator_name = 'ema'
+                numbers = re.findall(r'\d+', query)
+                window = int(numbers[0]) if numbers else 50
+            else:
+                indicator_name = 'sma'
+                numbers = re.findall(r'\d+', query)
+                window = int(numbers[0]) if numbers else 50
 
-        print(f"[Polygon.io] Parsed request: indicator='{indicator_name}', window={window}")
+        print(f"[Polygon.io] indicator='{indicator_name}', window={window}")
 
-        # Calculate date range (get enough historical data for indicators)
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=365)  # Get 1 year of data
+        start_date = end_date - timedelta(days=365)
         
-        # Format dates for Polygon API (YYYY-MM-DD format)
-        from_date = start_date.strftime('%Y-%m-%d')
-        to_date = end_date.strftime('%Y-%m-%d')
-
-        # Fetch historical data to calculate the indicator
         agg_bars = polygon_client.get_aggs(
             ticker=ticker,
             multiplier=1,
             timespan="day",
-            from_=from_date,
-            to=to_date  # Fixed: removed underscore, use 'to' instead of 'to_'
+            from_=start_date.strftime('%Y-%m-%d'),
+            to=end_date.strftime('%Y-%m-%d')
         )
         
         if not agg_bars:
-            return f"No historical data found for {ticker} on Polygon.io."
+            return f"No historical data found for {ticker}."
 
-        # Convert to DataFrame
         df = pd.DataFrame([{
             'time': bar.timestamp,
             'open': bar.open,
@@ -106,81 +146,59 @@ def get_technical_indicators(query: str) -> str:
         df.set_index('time', inplace=True)
         df.sort_index(inplace=True)
         
-        # Get current price for context
         current_price = df['close'].iloc[-1]
         
-        # Use pandas_ta to calculate the requested indicator
         if indicator_name == 'sma':
-            window = window or 50  # Default to 50 if not specified
-            df.ta.sma(length=window, append=True)
-            indicator_col = f'SMA_{window}'
+            window = window or 50
+            df[f'SMA_{window}'] = calculate_sma(df['close'], window)
+            latest_value = df[f'SMA_{window}'].iloc[-1]
             
-            if indicator_col not in df.columns:
-                return f"Unable to calculate SMA for {ticker}. Not enough data points."
-            
-            latest_value = df[indicator_col].iloc[-1]
             if pd.isna(latest_value):
-                return f"Unable to calculate {window}-day SMA for {ticker}. Not enough historical data."
+                return f"Not enough data to calculate {window}-day SMA for {ticker}."
             
             return f"Polygon.io Data for {ticker}:\n- Current Price: ${current_price:.2f}\n- Simple Moving Average ({window}-day): ${latest_value:.2f}"
 
         elif indicator_name == 'ema':
-            window = window or 50  # Default to 50 if not specified
-            df.ta.ema(length=window, append=True)
-            indicator_col = f'EMA_{window}'
+            window = window or 50
+            df[f'EMA_{window}'] = calculate_ema(df['close'], window)
+            latest_value = df[f'EMA_{window}'].iloc[-1]
             
-            if indicator_col not in df.columns:
-                return f"Unable to calculate EMA for {ticker}. Not enough data points."
-            
-            latest_value = df[indicator_col].iloc[-1]
             if pd.isna(latest_value):
-                return f"Unable to calculate {window}-day EMA for {ticker}. Not enough historical data."
+                return f"Not enough data to calculate {window}-day EMA for {ticker}."
             
             return f"Polygon.io Data for {ticker}:\n- Current Price: ${current_price:.2f}\n- Exponential Moving Average ({window}-day): ${latest_value:.2f}"
 
         elif indicator_name == 'rsi':
-            window = window or 14  # Default to 14
-            df.ta.rsi(length=window, append=True)
-            indicator_col = f'RSI_{window}'
+            window = window or 14
+            df[f'RSI_{window}'] = calculate_rsi(df['close'], window)
+            latest_value = df[f'RSI_{window}'].iloc[-1]
             
-            if indicator_col not in df.columns:
-                return f"Unable to calculate RSI for {ticker}. Not enough data points."
-            
-            latest_value = df[indicator_col].iloc[-1]
             if pd.isna(latest_value):
-                return f"Unable to calculate {window}-day RSI for {ticker}. Not enough historical data."
+                return f"Not enough data to calculate {window}-day RSI for {ticker}."
             
-            # RSI interpretation
             rsi_signal = "Overbought" if latest_value > 70 else "Oversold" if latest_value < 30 else "Neutral"
-            
             return f"Polygon.io Data for {ticker}:\n- Current Price: ${current_price:.2f}\n- RSI ({window}-day): {latest_value:.2f} ({rsi_signal})"
             
         elif indicator_name == 'macd':
-            df.ta.macd(append=True)
-            # MACD results in multiple columns
-            macd_col = 'MACD_12_26_9'
-            signal_col = 'MACDs_12_26_9'
-            histogram_col = 'MACDh_12_26_9'
+            macd_line, signal_line, histogram = calculate_macd(df['close'])
+            df['MACD'] = macd_line
+            df['MACD_signal'] = signal_line
+            df['MACD_hist'] = histogram
             
-            if macd_col not in df.columns:
-                return f"Unable to calculate MACD for {ticker}. Not enough data points."
+            latest_macd = df['MACD'].iloc[-1]
+            latest_signal = df['MACD_signal'].iloc[-1]
+            latest_hist = df['MACD_hist'].iloc[-1]
             
-            latest_macd_line = df[macd_col].iloc[-1]
-            latest_signal_line = df[signal_col].iloc[-1]
-            latest_histogram = df[histogram_col].iloc[-1]
+            if pd.isna(latest_macd) or pd.isna(latest_signal):
+                return f"Not enough data to calculate MACD for {ticker}."
             
-            if pd.isna(latest_macd_line) or pd.isna(latest_signal_line):
-                return f"Unable to calculate MACD for {ticker}. Not enough historical data."
-            
-            # MACD signal interpretation
-            macd_signal = "Bullish" if latest_macd_line > latest_signal_line else "Bearish"
-            
-            return f"Polygon.io Data for {ticker}:\n- Current Price: ${current_price:.2f}\n- MACD (12, 26, 9): {latest_macd_line:.4f}\n- Signal Line: {latest_signal_line:.4f}\n- Histogram: {latest_histogram:.4f}\n- Signal: {macd_signal}"
+            macd_signal = "Bullish" if latest_macd > latest_signal else "Bearish"
+            return f"Polygon.io Data for {ticker}:\n- Current Price: ${current_price:.2f}\n- MACD: {latest_macd:.4f}\n- Signal Line: {latest_signal:.4f}\n- Histogram: {latest_hist:.4f}\n- Signal: {macd_signal}"
 
         else:
-            return f"The requested indicator '{indicator_name}' is not supported. Available indicators: SMA, EMA, RSI, MACD."
+            return f"Indicator '{indicator_name}' not supported. Available: SMA, EMA, RSI, MACD."
 
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return f"An error occurred while getting technical indicators for {ticker}: {str(e)}"
+        return f"Error getting technical indicators for {ticker}: {str(e)}"
