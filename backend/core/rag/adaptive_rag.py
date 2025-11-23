@@ -1,6 +1,6 @@
 #backend\core\rag\adaptive_rag.py
 
-from langchain_mistralai import ChatMistralAI
+# from langchain_mistralai import ChatMistralAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from backend.config import settings
 mistral_model = "mistral-large-latest" 

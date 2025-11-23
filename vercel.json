@@ -8,6 +8,11 @@
     {
       "src": "frontend/**",
       "use": "@vercel/static"
+    },
+    {
+       "env": {},
+      "installCommand": "pip install -r requirements.txt",
+      "buildCommand": "vercel build"
     }
   ],
   "routes": [

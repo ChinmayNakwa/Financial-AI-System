@@ -4,7 +4,7 @@ from typing import List, TypedDict
 
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage
-from langchain_mistralai import ChatMistralAI
+# from langchain_mistralai import ChatMistralAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from backend.config import settings

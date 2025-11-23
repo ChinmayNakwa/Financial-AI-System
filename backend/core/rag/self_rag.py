@@ -4,7 +4,7 @@ from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.config import settings
-from langchain_mistralai import ChatMistralAI
+# from langchain_mistralai import ChatMistralAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 # llm = ChatMistralAI(model="mistral-large-latest", temperature=0, api_key=settings.MISTRAL_API_KEY)

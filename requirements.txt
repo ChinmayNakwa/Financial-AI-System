@@ -8,7 +8,7 @@ sec_api
 langchain
 # langchain-mistralai 
 langgraph
-google.generativeai
+# google.generativeai
 
 # pydantic 
 # pydantic_settings 
