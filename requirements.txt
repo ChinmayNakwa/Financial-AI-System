@@ -16,7 +16,7 @@ pydantic_settings
 dotenv 
 # typing 
 setuptools
-pandas-ta
+# pandas-ta
 langchain_google_genai
 
 fastapi

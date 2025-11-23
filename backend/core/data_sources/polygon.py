@@ -3,7 +3,7 @@
 from backend.config import settings
 from backend.core.data_sources.yahoo_finance import extract_financial_entities  # Reuse your smart ticker finder
 import pandas as pd
-import pandas_ta as ta
+# import pandas_ta as ta
 from polygon import RESTClient
 import json
 from datetime import datetime, timedelta
