@@ -207,5 +207,5 @@ workflow.add_edge("generator", END)
 app = workflow.compile()
 
 print("--- GRAPH STRUCTURE ---")
-app.get_graph().print_ascii()
+# app.get_graph().print_ascii()
 print("✅ Financial RAG Workflow Compiled!")
