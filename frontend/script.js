@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const welcomeView = document.getElementById('welcome-view');
     const promptCards = document.querySelectorAll('.prompt-card');
 
-    // const API_URL = 'http://127.0.0.1:8000/query';
+    // const API_URL = 'http://127.0.0.1:8000/backend/query';
     const API_URL = '/backend/query';
     let chatHistory = [];
 

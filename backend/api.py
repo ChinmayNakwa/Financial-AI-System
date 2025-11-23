@@ -2,9 +2,30 @@
 # backend/api.py (Temporary Smoke Test)
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI()
+app = FastAPI(
+    title="Financial AI API",
+    description="An API for the Financial AI Research",
+    version="0.1.1"
+)
+
+origins = [
+    "http://localhost:8501",  # Default for local Streamlit
+    "http://localhost:8000", 
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",  
+    "*"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class QueryRequest(BaseModel):
     query: str
