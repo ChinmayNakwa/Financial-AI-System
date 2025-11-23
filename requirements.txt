@@ -13,7 +13,7 @@ langgraph
 # pydantic 
 # pydantic_settings 
 dotenv 
-typing 
+# typing 
 setuptools
 # pandas-ta
 langchain_google_genai
