@@ -8,7 +8,7 @@ from backend.config import settings
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 # llm = ChatMistralAI(model="mistral-large-latest", temperature=0, api_key=settings.MISTRAL_API_KEY)
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
 
 class QualityCheck(BaseModel):
     """Results of quality assessment for financial data"""
