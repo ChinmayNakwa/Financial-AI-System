@@ -4,10 +4,6 @@
     {
       "source": "/backend/:path*",
       "destination": "/api/index.py"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/client/$1"
     }
   ]
 }
