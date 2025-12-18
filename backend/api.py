@@ -52,5 +52,3 @@ async def handle_query(request: QueryRequest):
 @app.get("/backend/", include_in_schema=False)
 def root():
     return {"message": "Financial RAG API is running. Go to /docs for the API documentation."}
-
-app = app
