@@ -11,7 +11,7 @@ import re
 # Use a more stable model for structured output
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash-lite", 
-    temperature=0,  # Lower temperature for more consistent JSON
+    temperature=0.3,  # Lower temperature for more consistent JSON
     api_key=settings.GOOGLE_API_KEY
 )
 
