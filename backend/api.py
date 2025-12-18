@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware 
 
-# --- CORRECTED ABSOLUTE IMPORT ---
 from backend.core.rag.financial_workflow import app as financial_rag_app
 
 origins = [
@@ -49,3 +48,5 @@ async def handle_query(request: QueryRequest):
 @app.get("/backend/", include_in_schema=False)
 def root():
     return {"message": "Financial RAG API is running. Go to /docs for the API documentation."}
+
+app = app

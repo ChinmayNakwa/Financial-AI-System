@@ -5,7 +5,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from backend.config import settings
 mistral_model = "mistral-large-latest" 
 # llm = ChatMistralAI(model=mistral_model, temperature=0, api_key=settings.MISTRAL_API_KEY)
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
     
 import sys
 import sys

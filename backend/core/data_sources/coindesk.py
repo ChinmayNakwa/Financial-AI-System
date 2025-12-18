@@ -7,7 +7,7 @@ from datetime import datetime
 
 coindesk_api_key = settings.COINDESK_API_KEY
 google_client = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash", api_key=settings.GOOGLE_API_KEY
+    model="gemini-2.5-flash-lite", api_key=settings.GOOGLE_API_KEY
 )
 
 

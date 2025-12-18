@@ -22,7 +22,7 @@ class IndicatorRequest(BaseModel):
     window: Optional[int] = Field(default=None, description="The time window or period for the indicator.")
 
 polygon_client = RESTClient(api_key=settings.POLYGON_API_KEY)
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=settings.GOOGLE_API_KEY, temperature=0)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", google_api_key=settings.GOOGLE_API_KEY, temperature=0)
 
 parser = JsonOutputParser(pydantic_object=IndicatorRequest)
 indicator_prompt = ChatPromptTemplate.from_template(

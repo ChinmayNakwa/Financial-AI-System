@@ -1,6 +1,4 @@
 # --- Python Virtual Environments ---
-# A good practice is to name your virtual environment 'venv' or 'myenv'
-# This covers the folder you are using.
 myenv/
 venv/
 .venv/
@@ -68,6 +66,15 @@ coverage.xml
 # --- Jupyter Notebook Checkpoints ---
 .ipynb_checkpoints
 
+# --- Next.js / Node.js ---
+client/node_modules/
+client/.next/
+client/out/
+.vercel/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 # --- Other common files to ignore ---
 # Example: If you have local test data you don't want to commit
 local_data/
@@ -77,3 +84,48 @@ local_data/
 langgraph.json
 
 .pdm-python
+
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# eslint
+.eslintcache
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

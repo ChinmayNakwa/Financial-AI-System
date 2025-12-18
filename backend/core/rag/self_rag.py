@@ -4,11 +4,16 @@ from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.config import settings
-# from langchain_mistralai import ChatMistralAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+import json
+import re
 
-# llm = ChatMistralAI(model="mistral-large-latest", temperature=0, api_key=settings.MISTRAL_API_KEY)
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
+# Use a more stable model for structured output
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash-lite", 
+    temperature=0,  # Lower temperature for more consistent JSON
+    api_key=settings.GOOGLE_API_KEY
+)
 
 class QualityCheck(BaseModel):
     """Results of quality assessment for financial data"""
@@ -18,7 +23,8 @@ class QualityCheck(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Overall confidence in quality")
     issues: List[str] = Field(default=[], description="Any quality issues found")
 
-structured_quality_checker = llm.with_structured_output(QualityCheck)
+# DON'T use with_structured_output - it's unreliable with Gemini
+# Instead, we'll manually parse JSON from the response
 
 quality_check_instructions = """
 You are a meticulous financial data quality analyst. Your task is to evaluate if retrieved information is useful for answering the user's query.
@@ -61,166 +67,160 @@ Error messages: "Could not find ticker", "API limit exceeded", "No data availabl
 Redirect responses: "Please try again later", "Service unavailable" → ❌ NOT RELEVANT
 Empty or truncated data: Incomplete tables, cut-off sentences → ❌ NOT RELEVANT
 Completely unrelated content: Sports news for financial query → ❌ NOT RELEVANT
+News with "No title - Unknown" → ❌ NOT RELEVANT (data retrieval failed)
 
 2. RECENCY Assessment
 Is the data current enough for financial decision-making?
 Time Sensitivity Rules:
 
 Real-time market data (stock prices, crypto prices): Must be from today or last trading day
-
-
-
-1 trading day old → ❌ NOT RECENT
-
-
-
-
 Financial news: Should be within last 30 days for relevance
-
-
-
-1 month old → ❌ NOT RECENT
-
-
-
-
 Company earnings/reports: Within last quarter (3 months) for current relevance
-
-
-
-3 months old → ❌ NOT RECENT
-
-
-
-
 Economic indicators (GDP, inflation, employment): Within last year
-
-
-
-1 year old → ❌ NOT RECENT
-
-
-
-
 SEC filings: Within last year unless historical analysis is specifically requested
-
-
-
-1 year old → ❌ NOT RECENT (unless historical context needed)
-
-
-
-
-
-Special Cases:
-
-Historical analysis queries: Older data may be relevant if specifically requested
-Trend analysis: Multi-year data may be appropriate
-Regulatory information: May remain relevant longer than market data
 
 3. RELIABILITY Assessment
 Is the source trustworthy and properly functioning?
-Approved Sources:
-
-All sources in the system list above are considered reliable ✅
-However, check for source-specific issues:
-
-Data formatting problems (malformed JSON, broken tables)
-Partial data retrieval (incomplete responses)
-Source error messages embedded in content
-
-
+Approved Sources: All sources in the system list above are considered reliable ✅
 
 Red Flags for Reliability:
-
-Content contains "Error 500", "Rate limit exceeded", "Invalid response"
-Garbled or nonsensical data (encoding issues)
-Contradictory information within the same source
-Missing critical fields (e.g., price data without currency, dates without year)
+- Content contains "Error 500", "Rate limit exceeded", "Invalid response"
+- Garbled or nonsensical data (encoding issues)
+- Missing critical fields (e.g., "No title - Unknown")
 
 4. CONFIDENCE Scoring Guidelines
 High Confidence (0.8-1.0):
-
 ✅ Directly relevant to query
 ✅ Recent data (within appropriate timeframe)
 ✅ Complete, well-formatted information
 ✅ From approved source with no error indicators
 
 Medium Confidence (0.5-0.79):
-
 ⚠️ Somewhat relevant but indirect
 ⚠️ Slightly outdated but still useful
 ⚠️ Minor formatting issues but data is extractable
 ⚠️ Partial information that contributes to answer
 
 Low Confidence (0.0-0.49):
-
 ❌ Poor relevance to query
 ❌ Significantly outdated
 ❌ Major data quality issues
 ❌ Contains error messages or failed retrievals
 
 5. Issues Identification
-Document specific problems found:
-Content Issues:
+Document specific problems found.
 
-"Outdated information (X days/months old)"
-"Incomplete data retrieval"
-"Formatting problems detected"
-"Contains error messages"
-"Wrong company/ticker symbol"
-"Missing critical data fields"
-"Data appears corrupted or garbled"
+YOU MUST RESPOND WITH ONLY VALID JSON IN THIS EXACT FORMAT:
+{
+  "is_recent": true/false,
+  "is_reliable": true/false,
+  "is_relevant": true/false,
+  "confidence": 0.0-1.0,
+  "issues": ["issue1", "issue2"]
+}
 
-Relevance Issues:
-
-"Content doesn't address the specific query"
-"Too general for specific data request"
-"Discusses unrelated topics"
-"Historical data when current data requested"
-
-Source Issues:
-
-"API error embedded in response"
-"Partial response due to service issues"
-"Rate limiting affecting data quality"
-
-Decision Framework:
-
-First: Check if content actually contains useful information (not errors)
-Second: Verify relevance to the specific query asked
-Third: Assess recency based on data type and query needs
-Fourth: Calculate confidence based on all factors
-Finally: Document any issues that affect usability
-
-Examples for Context:
-Example 1 - High Quality:
-
-Query: "What is Apple's current stock price?"
-Source: yahoo_finance
-Content: "Apple Inc. (AAPL) is currently trading at $182.52, up 1.2% from yesterday's close..."
-Assessment: ✅ Relevant, ✅ Recent, ✅ Reliable → Confidence: 0.95
-
-Example 2 - Low Quality:
-
-Query: "What is Tesla's P/E ratio?"
-Source: yahoo_finance
-Content: "Error: Could not retrieve data for ticker TSLA. Please try again later."
-Assessment: ❌ Not Relevant (error), ❌ No useful data → Confidence: 0.0
-
-Example 3 - Medium Quality:
-
-Query: "Should I invest in tech stocks?"
-Source: newsapi
-Content: "Microsoft reported strong Q2 earnings last month, with cloud revenue up 20%..."
-Assessment: ✅ Relevant for tech analysis, ⚠️ Month old but acceptable, ✅ Reliable → Confidence: 0.75
+DO NOT include any other text, explanations, or markdown formatting. ONLY the JSON object.
 """
 
 def check_quality(source: str, content: str, query: str) -> QualityCheck:
     """Evaluate the quality of financial information"""
-    message = HumanMessage(
-        content=f"Source: {source}\n\nContent:\n{content[:3000]}\n\nOriginal Query: {query}"
-    )
-    system_msg = SystemMessage(content=quality_check_instructions)
-    
-    return structured_quality_checker.invoke([system_msg, message])
+    try:
+        # Check for empty or very short content
+        if not content or len(content.strip()) < 10:
+            print(f"[Quality Check] Content too short for {source}")
+            return QualityCheck(
+                is_recent=False, 
+                is_reliable=False, 
+                is_relevant=False, 
+                confidence=0.0, 
+                issues=["Content too short or empty"]
+            )
+        
+        # Check for common error patterns in content
+        error_keywords = ["error", "failed", "could not", "unavailable", "exception"]
+        content_lower = content.lower()
+        if any(keyword in content_lower for keyword in error_keywords) and len(content) < 200:
+            print(f"[Quality Check] Error detected in content for {source}")
+            return QualityCheck(
+                is_recent=False, 
+                is_reliable=False, 
+                is_relevant=False, 
+                confidence=0.0, 
+                issues=["Content contains error messages"]
+            )
+        
+        # Check for "No title - Unknown" pattern (failed news retrieval)
+        if "No title - Unknown" in content:
+            print(f"[Quality Check] Failed data retrieval detected in {source}")
+            return QualityCheck(
+                is_recent=False, 
+                is_reliable=False, 
+                is_relevant=False, 
+                confidence=0.0, 
+                issues=["News data retrieval failed - contains 'No title - Unknown'"]
+            )
+        
+        prompt = f"""Source: {source}
+
+            Content:
+            {content[:3000]}
+
+            Original Query: {query}
+
+            Analyze this content and return your assessment as JSON."""
+        
+        response = llm.invoke([
+            SystemMessage(content=quality_check_instructions),
+            HumanMessage(content=prompt)
+        ])
+        
+        response_text = response.content
+        print(f"[DEBUG Quality Check] Raw LLM response for {source}: {response_text[:200]}")
+        
+        # Extract JSON from the response
+        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(0)
+            data = json.loads(json_str)
+            
+            # Validate and create QualityCheck object
+            result = QualityCheck(
+                is_recent=data.get("is_recent", False),
+                is_reliable=data.get("is_reliable", False),
+                is_relevant=data.get("is_relevant", False),
+                confidence=float(data.get("confidence", 0.0)),
+                issues=data.get("issues", [])
+            )
+            
+            print(f"Quality Check for {source}: Relevant={result.is_relevant}, Confidence={result.confidence}")
+            return result
+        else:
+            print(f"[Quality Check] No JSON found in LLM response for {source}")
+            return QualityCheck(
+                is_recent=False, 
+                is_reliable=False, 
+                is_relevant=False, 
+                confidence=0.0, 
+                issues=["Failed to parse LLM response as JSON"]
+            )
+        
+    except json.JSONDecodeError as je:
+        print(f"[Quality Check] JSON decode error for {source}: {je}")
+        return QualityCheck(
+            is_recent=False, 
+            is_reliable=False, 
+            is_relevant=False, 
+            confidence=0.0, 
+            issues=[f"JSON parsing error: {str(je)}"]
+        )
+    except Exception as e:
+        print(f"Quality check internal error for {source}: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return QualityCheck(
+            is_recent=False, 
+            is_reliable=False, 
+            is_relevant=False, 
+            confidence=0.0, 
+            issues=[f"Exception: {str(e)}"]
+        )

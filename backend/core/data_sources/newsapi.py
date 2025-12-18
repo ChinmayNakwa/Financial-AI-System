@@ -39,21 +39,32 @@ def get_financial_news(query: str) -> str:
 
             term_header = f"Top news related to '{term}':\n"
             
-            # --- THIS IS THE CORRECTED LOGIC ---
-            # The 'for article in articles' part is now correctly included in the list comprehension.
-            article_details = [
-                (
-                    f"Title: {article['title']}\n"
-                    f"Source: {article['source']['name']}\n"
-                    f"Published At: {article['publishedAt'][:10]}"
+            article_details = []
+            for article in articles:
+                # Add safe extraction with fallbacks
+                title = article.get('title', 'No title available')
+                source_name = article.get('source', {}).get('name', 'Unknown source')
+                published_at = article.get('publishedAt', 'Unknown date')
+                description = article.get('description', 'No description available')
+                
+                # Format date safely
+                if published_at and published_at != 'Unknown date':
+                    try:
+                        published_at = published_at[:10]
+                    except:
+                        published_at = 'Unknown date'
+                
+                article_details.append(
+                    f"Title: {title}\n"
+                    f"Source: {source_name}\n"
+                    f"Published: {published_at}\n"
+                    f"Summary: {description[:200]}..."
                 )
-                for article in articles
-            ]
-            # ------------------------------------
 
             all_news_summaries.append(term_header + "\n---\n".join(article_details))
 
         except Exception as e:
+            print(f"[NewsAPI Error] Failed to fetch news for '{term}': {e}")
             all_news_summaries.append(f"An error occurred with NewsAPI for query '{term}': {e}")
             
-    return "\n\n=====\n\n".join(all_news_summaries)
+    return "\n\n=====\n\n".join(all_news_summaries) if all_news_summaries else "No news data could be retrieved."
