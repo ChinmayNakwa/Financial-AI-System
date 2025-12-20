@@ -179,7 +179,18 @@ def generate_answer_node(state: GraphState) -> dict:
         
         response = llm.invoke([HumanMessage(content=prompt)])
         
-        return {"final_answer": response.content}
+        content = response.content
+        if isinstance(content, str):
+            # If it's already a string, use it directly
+            answer_text = content
+        elif isinstance(content, list) and len(content) > 0:
+            # If it's a list, extract the text from the first element
+            answer_text = content[0]['text']
+        else:
+            answer_text = str(content)
+        
+        return {"final_answer": answer_text}
+        
     
     except Exception as e:
         print(f"⚠️ Error in generate_answer_node: {e}")
