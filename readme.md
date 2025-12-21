@@ -14,6 +14,13 @@ The system leverages a suite of live financial data APIs and is architected arou
 - **API-Ready:** Exposed via a FastAPI endpoint for easy integration into other applications.
 - **Modern Frontend:** A clean, responsive Next.js chat interface with real-time "Agent Reasoning" status updates.
 
+
+<img width="1335" height="672" alt="image" src="https://github.com/user-attachments/assets/0b1ebfce-087e-4d14-bd44-dbda86db719b" />
+
+
+https://github.com/user-attachments/assets/3247cb3f-6dc2-418d-96dc-ac4cf5b6792c
+
+
 ---
 
 ## Core Concepts: The Advanced RAG Architecture
