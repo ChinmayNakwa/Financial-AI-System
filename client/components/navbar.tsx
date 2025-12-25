@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FaGithub } from 'react-icons/fa'
 
 export default function Navbar() {
   return (
@@ -10,6 +11,7 @@ export default function Navbar() {
         <div className="flex gap-6 text-sm font-medium">
           <Link href="/" className="transition-colors hover:text-blue-400">About</Link>
           <Link href="/chat" className="transition-colors hover:text-blue-400">Chat</Link>
+          <Link href="https://github.com/ChinmayNakwa/Financial-AI-System" target="_blank" className="transition-colors hover:text-blue-400">  <FaGithub className="h-5 w-5" /></Link>
         </div>
       </div>
     </nav>
