@@ -9,11 +9,11 @@ import json
 import re
 
 # Use a more stable model for structured output
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite", 
-    temperature=0.3,  # Lower temperature for more consistent JSON
-    api_key=settings.GOOGLE_API_KEY
-)
+# llm = ChatGoogleGenerativeAI(
+#     model="gemini-2.5-flash-lite", 
+#     temperature=0.3,  # Lower temperature for more consistent JSON
+#     api_key=settings.GOOGLE_API_KEY
+# )
 
 class QualityCheck(BaseModel):
     """Results of quality assessment for financial data"""
@@ -23,8 +23,7 @@ class QualityCheck(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Overall confidence in quality")
     issues: List[str] = Field(default=[], description="Any quality issues found")
 
-# DON'T use with_structured_output - it's unreliable with Gemini
-# Instead, we'll manually parse JSON from the response
+SOFT_RECENCY_SOURCES = {"newsapi", "tavily"}
 
 quality_check_instructions = """
 You are a meticulous financial data quality analyst. Your task is to evaluate if retrieved information is useful for answering the user's query.
@@ -122,8 +121,14 @@ YOU MUST RESPOND WITH ONLY VALID JSON IN THIS EXACT FORMAT:
 DO NOT include any other text, explanations, or markdown formatting. ONLY the JSON object.
 """
 
-def check_quality(source: str, content: str, query: str) -> QualityCheck:
+def check_quality(source: str, content: str, query: str, api_key: str) -> QualityCheck:
     """Evaluate the quality of financial information"""
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash-lite", 
+        temperature=0.3,  # Lower temperature for more consistent JSON
+        api_key=api_key
+    )
+
     try:
         # Check for empty or very short content
         if not content or len(content.strip()) < 10:
@@ -159,6 +164,17 @@ def check_quality(source: str, content: str, query: str) -> QualityCheck:
                 confidence=0.0, 
                 issues=["News data retrieval failed - contains 'No title - Unknown'"]
             )
+        
+        if source in SOFT_RECENCY_SOURCES:
+            # Accept news if it clearly contains headlines
+            if "Title:" in content or "Top news related to" in content:
+                return QualityCheck(
+                    is_recent=True,        # allow future-dated or aggregated news
+                    is_reliable=True,
+                    is_relevant=True,
+                    confidence=0.65,       # soft confidence
+                    issues=["Soft recency applied for news source"]
+                )
         
         prompt = f"""Source: {source}
 

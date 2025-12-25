@@ -2,7 +2,7 @@ from tavily import TavilyClient
 from backend.config import settings
 
 
-def search_web(query: str) -> str:
+def search_web(query: str, api_key: str) -> str:
     """
     Performs a general web search using Tavily for broad financial topics,
     definitions, or recent events not covered by other specific APIs.

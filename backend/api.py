@@ -31,16 +31,19 @@ app.add_middleware(
 # Define API Request and Response Models
 class QueryRequest(BaseModel):
     query: str
+    api_key: str
 
 class QueryResponse(BaseModel):
     answer: str
-
 
 @app.post("/backend/query", response_model=QueryResponse)
 async def handle_query(request: QueryRequest):
     try:
         print(f"🚀 Received API query: '{request.query}'")
-        inputs = {"user_question": request.query}
+        inputs = {
+            "user_question": request.query,
+            "google_api_key": request.api_key 
+        }
         final_state = await financial_rag_app.ainvoke(inputs, {"recursion_limit": 15})
         answer = final_state.get("final_answer", "Sorry, I could not find enough information to answer.")
         print("✅ Sending API response.")

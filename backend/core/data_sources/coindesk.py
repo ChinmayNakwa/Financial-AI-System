@@ -6,12 +6,12 @@ from backend.config import settings
 from datetime import datetime
 
 coindesk_api_key = settings.COINDESK_API_KEY
-google_client = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite", api_key=settings.GOOGLE_API_KEY
-)
+# google_client = ChatGoogleGenerativeAI(
+#     model="gemini-2.5-flash-lite", api_key=settings.GOOGLE_API_KEY
+# )
 
 
-def get_instruments(prompt: str) -> list[str]:
+def get_instruments(prompt: str, api_key: str) -> list[str]:
     instrument_prompt = f"""From the user's financial question below, extract the cryptocurrency instrument tickers.
 - Format: BASE-QUOTE (BTC-USD, ETH-EUR).
 - Default quote currency: USD.
@@ -22,6 +22,7 @@ User Question: "{prompt}"
 
 Return only a comma-separated list of tickers.
 """
+    google_client = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", api_key=api_key)
     chat_prompt = ChatPromptTemplate.from_template(instrument_prompt)
     response = google_client.generate(
         [{"role": "user", "content": chat_prompt.format()}]

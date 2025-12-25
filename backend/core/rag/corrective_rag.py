@@ -8,7 +8,7 @@ from backend.config import settings
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 # llm = ChatMistralAI(model="mistral-large-latest", temperature=0, api_key=settings.MISTRAL_API_KEY)
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
+# llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
     
 
 class FactCheckResult(BaseModel):
@@ -19,7 +19,6 @@ class FactCheckResult(BaseModel):
     final_value: Optional[str] = Field(..., description="Resolved value after verification")
     discrepancies: List[str] = Field(default=[], description="Any inconsistencies found")
 
-structured_fact_checker = llm.with_structured_output(FactCheckResult)
 
 fact_check_instructions = """
 You are a financial data reconciliation expert. Compare information from multiple sources:
@@ -34,8 +33,11 @@ You are a financial data reconciliation expert. Compare information from multipl
 5. Resolve final value based on most reliable sources
 """
 
-def verify_facts(sources: List[Dict[str, str]], query: str) -> FactCheckResult:
+def verify_facts(sources: List[Dict[str, str]], query: str, api_key: str) -> FactCheckResult:
     """Cross-check financial information from multiple sources"""
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.5, api_key=api_key)
+    structured_fact_checker = llm.with_structured_output(FactCheckResult)
+
     sources_text = "\n".join(
         f"Source {i+1} ({s['source']}): {s['content'][:1000]}"
         for i, s in enumerate(sources)

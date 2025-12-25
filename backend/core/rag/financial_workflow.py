@@ -34,6 +34,7 @@ class Document(TypedDict):
 class GraphState(TypedDict):
     """Represents the state of our graph."""
     user_question: str
+    google_api_key: str
     route: RouteQuery
     documents: List[Document]
     final_answer: str
@@ -58,8 +59,7 @@ tool_map = {
 def route_query_node(state: GraphState) -> dict:
     """Node 1: Route the user's query (Adaptive RAG)."""
     print("--- NODE: ROUTING QUERY ---")
-    question = state["user_question"]
-    route = route_financial_query(question)
+    route = route_financial_query(state["user_question"], state["google_api_key"])
     print(f"Route: Primary -> {route.primary_datasource}, Secondary -> {route.secondary_sources}")
     return {"route": route}
 
@@ -77,7 +77,7 @@ def retrieve_documents_node(state: GraphState) -> dict:
         if source_name in tool_map:
             tool = tool_map[source_name]
             print(f"Calling tool: {source_name}")
-            content = tool(question)
+            content = tool(question, api_key=state["google_api_key"]) 
             documents.append({"source": source_name, "content": content, "quality_check": None})
         else:
             print(f"Warning: Source '{source_name}' not found in tool map.")
@@ -98,7 +98,7 @@ def quality_filter_node(state: GraphState) -> dict:
 
     for doc in state["documents"]:
         try:
-            quality_check = check_quality(doc["source"], doc["content"], question)
+            quality_check = check_quality(doc["source"], doc["content"], question, state["google_api_key"])
             if quality_check and quality_check.is_relevant and quality_check.confidence >= 0.4:
                 print(f"✅ Quality Check Passed for {doc['source']}: Confidence={quality_check.confidence}")
                 doc_copy = doc.copy()
@@ -120,7 +120,7 @@ def reconcile_facts_node(state: GraphState) -> dict:
     
     try:
         sources_for_verification = [{"source": doc["source"], "content": doc["content"]} for doc in documents]
-        fact_check_result = verify_facts(sources_for_verification, question)
+        fact_check_result = verify_facts(sources_for_verification, question,state["google_api_key"])
         
         # Add None check
         if fact_check_result is None:
@@ -169,7 +169,7 @@ def generate_answer_node(state: GraphState) -> dict:
             "**Your Process:**\n"
             "1.  **Acknowledge the Data:** Begin your response by stating what data you have successfully retrieved from the context.\n"
             "2.  **Address Each Part of the Question:** Go through the user's question piece by piece.\n"
-            "3.  **Cite Your Source:** For every piece of data you present, you must cite it directly from the provided JSON. For example: 'According to the yahoo_finance data, the trailing P/E for AAPL is X.'\n"
+            "3.  **Cite Your Source:** For every piece of data you present, you must cite it directly from the provided JSON. For example: 'According to the yahoo finance data, the trailing P/E for AAPL is X.'\n"
             "4.  **State Missing Information:** If a piece of requested information (like a specific metric or ticker) is not present in the JSON, you MUST explicitly state that it was not found in the provided data.\n"
             "5.  **Perform Analysis (If Requested):** If asked to perform analysis (like comparing growth prospects), base your analysis *only* on the numbers and facts present in the data.\n\n"
             "Failure to adhere to these rules and sourcing data from outside the provided data context will result in a failed task."

@@ -6,12 +6,12 @@ from .yahoo_finance import extract_financial_entities
 
 newsapi = NewsApiClient(api_key=settings.NEWS_API_KEY)
 
-def get_financial_news(query: str) -> str:
+def get_financial_news(query: str, api_key: str) -> str:
     """
     Fetches news from NewsAPI. It uses the central AI extractor to find tickers,
     and if none are found, it falls back to the original query.
     """
-    entities = extract_financial_entities(query)
+    entities = extract_financial_entities(query, api_key)
     search_terms = entities.get("tickers", [])
     
     if not search_terms:

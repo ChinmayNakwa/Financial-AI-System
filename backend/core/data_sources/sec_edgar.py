@@ -7,12 +7,12 @@ from .yahoo_finance import extract_financial_entities
 
 query_api = QueryApi(api_key=settings.SEC_API_KEY)
 
-def get_sec_filings(query: str) -> str:
+def get_sec_filings(query: str, api_key: str) -> str:
     """
     Fetches recent SEC filings for ALL tickers identified in the query by the central AI extractor.
     """
     # 2. Use the central extractor to get the tickers
-    entities = extract_financial_entities(query)
+    entities = extract_financial_entities(query, api_key)
     ticker_symbols = entities.get("tickers", [])
     
     if not ticker_symbols:

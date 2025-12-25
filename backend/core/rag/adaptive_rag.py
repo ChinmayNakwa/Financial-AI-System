@@ -5,7 +5,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from backend.config import settings
 mistral_model = "mistral-large-latest" 
 # llm = ChatMistralAI(model=mistral_model, temperature=0, api_key=settings.MISTRAL_API_KEY)
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
+# llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
     
 import sys
 import sys
@@ -60,7 +60,6 @@ class RouteQuery(BaseModel):
         description="Confidence in routing decision (0.0 to 1.0)"
     )
 
-structured_llm_router = llm.with_structured_output(RouteQuery)
 
 router_instructions = """
 You are an expert financial data routing engine. Your primary function is to analyze a user's financial question and create a structured routing plan. You must reason about the user's intent and select the optimal primary and secondary data sources to provide a complete and accurate answer.
@@ -130,9 +129,11 @@ You are an expert financial data routing engine. Your primary function is to ana
 → primary: sec_edgar, secondary: [], query_type: company_analysis, confidence: 1.0
 """
 
-def route_financial_query(user_question: str) -> RouteQuery:
+def route_financial_query(user_question: str, api_key: str) -> RouteQuery:
     """Route a user's financial question to appropriate data sources"""
-    
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.5, api_key=api_key)
+    structured_llm_router = llm.with_structured_output(RouteQuery)
+
     message = HumanMessage(content=f"Route this financial question: {user_question}")
     system_msg = SystemMessage(content=router_instructions)
     

@@ -1,4 +1,3 @@
-
 # backend/core/data_sources/yahoo_finance.py
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -10,9 +9,9 @@ from backend.config import settings
 import pandas as pd
 from datetime import datetime, timedelta
 
-google_client = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite", api_key=settings.GOOGLE_API_KEY
-)
+# google_client = ChatGoogleGenerativeAI(
+#     model="gemini-2.5-flash-lite", api_key=settings.GOOGLE_API_KEY
+# )
 
 
 def format_news_safely(news_items):
@@ -50,13 +49,18 @@ def format_news_safely(news_items):
     
     return "\n".join(formatted_news) if formatted_news else "• No recent news available"
 
-def extract_financial_entities(query: str) -> dict:
+def extract_financial_entities(query: str, api_key: str) -> dict:
     """
     Uses Gemini (via LangChain wrapper) to extract tickers, metrics, and data types.
     Returns: {"tickers": [...], "metrics": [...], "data_types": [...]}
     """
-    if not settings.GOOGLE_API_KEY:
+
+    if not api_key:
         return {"tickers": [], "metrics": [], "data_types": ["info"]}
+
+    google_client = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash-lite", api_key=api_key
+    )
 
     try:
         possible_metrics = [
@@ -335,14 +339,14 @@ def get_earnings_info(ticker):
         return f"Error getting earnings info: {e}"
 
 
-def get_stock_data(query: str) -> str:
+def get_stock_data(query: str, api_key: str) -> str:
     """
     Main entry point for Yahoo Finance data retrieval.
     Uses Gemini to extract tickers, metrics, and data types from natural language query.
     """
     print(f"[Yahoo Finance] Processing query: '{query}'")
     
-    entities = extract_financial_entities(query)
+    entities = extract_financial_entities(query, api_key)
     tickers = entities.get("tickers", [])
     metrics = entities.get("metrics", [])
     data_types = entities.get("data_types", ["info"])

@@ -22,7 +22,7 @@ class IndicatorRequest(BaseModel):
     window: Optional[int] = Field(default=None, description="The time window or period for the indicator.")
 
 polygon_client = RESTClient(api_key=settings.POLYGON_API_KEY)
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", google_api_key=settings.GOOGLE_API_KEY, temperature=0)
+# llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", google_api_key=settings.GOOGLE_API_KEY, temperature=0)
 
 parser = JsonOutputParser(pydantic_object=IndicatorRequest)
 indicator_prompt = ChatPromptTemplate.from_template(
@@ -38,9 +38,8 @@ indicator_prompt = ChatPromptTemplate.from_template(
     """
 ).partial(format_instructions=parser.get_format_instructions())
 
-indicator_chain = indicator_prompt | llm | parser
 
-def extract_ticker_fallback(query: str) -> Optional[str]:
+def extract_ticker_fallback(query: str, api_key: str) -> Optional[str]:
     ticker_map = {
         'apple': 'AAPL', 'microsoft': 'MSFT', 'google': 'GOOGL', 
         'alphabet': 'GOOGL', 'amazon': 'AMZN', 'tesla': 'TSLA',
@@ -77,10 +76,11 @@ def calculate_macd(data, fast=12, slow=26, signal=9):
     histogram = macd_line - signal_line
     return macd_line, signal_line, histogram
 
-def get_technical_indicators(query: str) -> str:
+def get_technical_indicators(query: str, api_key: str) -> str:
     ticker = None
+    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", api_key=api_key)
     try:
-        ticker_info = extract_financial_entities(query)
+        ticker_info = extract_financial_entities(query, api_key)
         if ticker_info and ticker_info.get('tickers'):
             ticker = ticker_info['tickers'][0]
     except Exception as e:
@@ -95,6 +95,8 @@ def get_technical_indicators(query: str) -> str:
 
     try:
         try:
+            
+            indicator_chain = indicator_prompt | llm | parser
             request = indicator_chain.invoke({"query": query})
             indicator_name = request.get('indicator_name', 'sma')
             window = request.get('window')
