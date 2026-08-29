@@ -124,7 +124,7 @@ DO NOT include any other text, explanations, or markdown formatting. ONLY the JS
 def check_quality(source: str, content: str, query: str, api_key: str) -> QualityCheck:
     """Evaluate the quality of financial information"""
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash", 
+        model="gemini-3.7-flash", 
         temperature=0.3,  # Lower temperature for more consistent JSON
         api_key=api_key
     )

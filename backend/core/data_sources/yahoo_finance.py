@@ -59,7 +59,7 @@ def extract_financial_entities(query: str, api_key: str) -> dict:
         return {"tickers": [], "metrics": [], "data_types": ["info"]}
 
     google_client = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash", api_key=api_key
+        model="gemini-3.7-flash", api_key=api_key
     )
 
     try:

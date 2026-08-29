@@ -131,7 +131,7 @@ The current year is 2026 and the month is march.
 
 def route_financial_query(user_question: str, api_key: str) -> RouteQuery:
     """Route a user's financial question to appropriate data sources"""
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.5, api_key=api_key)
+    llm = ChatGoogleGenerativeAI(model="gemini-3.7-flash", temperature=0.5, api_key=api_key)
     structured_llm_router = llm.with_structured_output(RouteQuery)
 
     message = HumanMessage(content=f"Route this financial question: {user_question}")
