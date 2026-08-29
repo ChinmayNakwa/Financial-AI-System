@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.config import settings
+from backend.core.llm_utils import current_date_str
 # from langchain_mistralai import ChatMistralAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -21,7 +22,7 @@ class FactCheckResult(BaseModel):
 
 
 fact_check_instructions = """
-You are a financial data reconciliation expert. The current year is 2026 and the month is march. Compare information from multiple sources:
+You are a financial data reconciliation expert. The current date is __CURRENT_DATE__. Compare information from multiple sources:
 
 1. Identify core facts that should match (prices, dates, figures)
 2. Note any significant discrepancies (>2% difference for numbers)
@@ -46,6 +47,6 @@ def verify_facts(sources: List[Dict[str, str]], query: str, api_key: str) -> Fac
     message = HumanMessage(
         content=f"Query: {query}\n\nSources:\n{sources_text}"
     )
-    system_msg = SystemMessage(content=fact_check_instructions)
+    system_msg = SystemMessage(content=fact_check_instructions.replace("__CURRENT_DATE__", current_date_str()))
     
     return structured_fact_checker.invoke([system_msg, message])

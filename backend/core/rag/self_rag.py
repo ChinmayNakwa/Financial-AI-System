@@ -4,6 +4,7 @@ from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.config import settings
+from backend.core.llm_utils import llm_text, current_date_str
 from langchain_google_genai import ChatGoogleGenerativeAI
 import json
 import re
@@ -28,7 +29,7 @@ SOFT_RECENCY_SOURCES = {"newsapi", "tavily"}
 quality_check_instructions = """
 You are a meticulous financial data quality analyst. Your task is to evaluate if retrieved information is useful for answering the user's query.
 Your System's Data Sources (These are considered RELIABLE):
-The current year is 2026 and the month is march.
+The current date is __CURRENT_DATE__. Data dated on or before this date is NOT "in the future".
 yahoo_finance: Stock prices, company info, historical data
 polygon_io: Technical indicators, market data for stocks
 fred: US economic data, macroeconomic indicators
@@ -186,11 +187,11 @@ def check_quality(source: str, content: str, query: str, api_key: str) -> Qualit
             Analyze this content and return your assessment as JSON."""
         
         response = llm.invoke([
-            SystemMessage(content=quality_check_instructions),
+            SystemMessage(content=quality_check_instructions.replace("__CURRENT_DATE__", current_date_str())),
             HumanMessage(content=prompt)
         ])
         
-        response_text = response.content
+        response_text = llm_text(response)
         print(f"[DEBUG Quality Check] Raw LLM response for {source}: {response_text[:200]}")
         
         # Extract JSON from the response

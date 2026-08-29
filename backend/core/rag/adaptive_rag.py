@@ -3,6 +3,7 @@
 # from langchain_mistralai import ChatMistralAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from backend.config import settings
+from backend.core.llm_utils import current_date_str
 # mistral_model = "mistral-large-latest" 
 # llm = ChatMistralAI(model=mistral_model, temperature=0, api_key=settings.MISTRAL_API_KEY)
 # llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
@@ -63,7 +64,7 @@ class RouteQuery(BaseModel):
 
 router_instructions = """
 You are an expert financial data routing engine. Your primary function is to analyze a user's financial question and create a structured routing plan. You must reason about the user's intent and select the optimal primary and secondary data sources to provide a complete and accurate answer.
-The current year is 2026 and the month is march.
+The current date is __CURRENT_DATE__.
 ## Your Reasoning Process (Chain of Thought):
 1.  **Deconstruct the Query:** What is the core question? What specific entities (stocks, economic indicators, cryptocurrencies) are mentioned?
 2.  **Identify Information Needs:** What specific data points are required to answer this question (e.g., price data, news articles, official filings, technical indicators)?
@@ -135,7 +136,7 @@ def route_financial_query(user_question: str, api_key: str) -> RouteQuery:
     structured_llm_router = llm.with_structured_output(RouteQuery)
 
     message = HumanMessage(content=f"Route this financial question: {user_question}")
-    system_msg = SystemMessage(content=router_instructions)
+    system_msg = SystemMessage(content=router_instructions.replace("__CURRENT_DATE__", current_date_str()))
     
     response = structured_llm_router.invoke([system_msg, message])
     return response
