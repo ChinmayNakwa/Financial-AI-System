@@ -8,8 +8,8 @@ The system leverages a suite of live financial data APIs and is architected arou
 ## Key Features
 
 - **Multi-Source Data Integration:** Connects to live APIs for stock prices (Yahoo Finance), economic data (FRED), financial news (NewsAPI), cryptocurrency prices (CoinDesk), SEC filings (EDGAR), Technical Indicators (Polygon.io), and general web search (Tavily).
-- **Intelligent Tool Use:** The agent can reason about which tool is best for a given query and can use tools in sequence to solve multi-step problems.
-- **Self-Correction & Planning:** For complex queries, the agent can recognize when it lacks information, use a search tool to find the missing pieces, and then continue its task.
+- **Intelligent Tool Use:** The agent reasons about which data sources best fit a query and can query several of them in parallel for one question.
+- **Quality Filtering & Reconciliation:** Retrieved data is graded for relevance before use, and when multiple sources are consulted their facts are cross-checked and reconciled into a single answer.
 - **Dynamic & Flexible:** Can answer questions about financial instruments and economic indicators it wasn't explicitly pre-programmed to know about.
 - **API-Ready:** Exposed via a FastAPI endpoint for easy integration into other applications.
 - **Modern Frontend:** A clean, responsive Next.js chat interface with real-time "Agent Reasoning" status updates.
@@ -37,13 +37,14 @@ This project is built on three pillars of advanced Retrieval-Augmented Generatio
 -   **Concept:** The system critically evaluates the information it has just retrieved *before* using it, reflecting on its relevance and quality.
 -   **Implementation:** After a tool returns information, the result is fed into the `quality_filter` node. The agent assesses this new information against the original goal. If a tool returns irrelevant data or an error message, the agent filters it out, preventing low-quality data from reaching the user.
 
-### 3. Corrective RAG: The Multi-Step Researcher
+### 3. Corrective RAG: The Fact Reconciler
 
--   **Concept:** The system can fix its own knowledge gaps or resolve conflicting information by taking additional, corrective steps.
--   **Implementation:** This is the primary strength of the LangGraph agent's cyclical workflow (`router` -> `retriever` -> `reconciler` -> `generator`).
-    -   **Discovery & Enrichment:** For complex queries, the agent can recognize it doesn't know a specific detail (e.g., a list of competitors).
-    -   **Correction:** It uses the `tavily` search tool to discover missing entities, then loops back to fetch specific financial data for those new entities.
-    -   **Synthesis:** The `reconciler` node identifies discrepancies between sources and resolves them before the final answer is generated.
+-   **Concept:** When several sources are consulted for the same question, the system corrects conflicting or unreliable information before answering rather than passing the raw context straight to the LLM.
+-   **Implementation:** The graph runs `router` -> `retriever` -> `quality_filter` -> `reconciler` (only when more than one document survives the quality filter) -> `generator`.
+    -   **Correction:** The `quality_filter` node drops documents that are irrelevant, stale, or contain error responses.
+    -   **Synthesis:** The `reconciler` node identifies discrepancies between the remaining sources, picks the most reliable value, and collapses them into a single reconciled document (or, if they genuinely conflict, forwards all of them so the generator can describe the disagreement).
+
+> Note: the graph is a linear pipeline — it does not currently loop back to re-retrieve after discovering a knowledge gap.
 
 ---
 
