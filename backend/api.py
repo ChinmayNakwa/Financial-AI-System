@@ -9,8 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.core.rag.financial_workflow import app as financial_rag_app
 
 origins = [
-    "*",  # Allows all origins. For production, you might want to restrict this
-          # to your actual frontend domain, e.g., "https://yourapp.com"
+    "*",  # Allows all origins. For production, restrict this to your actual
+          # frontend domain, e.g., "https://yourapp.com"
 ]
 
 # Initialize FastAPI Application
@@ -23,7 +23,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=False,  # must be False when allow_origins is "*" (browsers reject the pair)
     allow_methods=["*"],  # Allows all methods (GET, POST, OPTIONS, etc.)
     allow_headers=["*"],  # Allows all headers
 )
