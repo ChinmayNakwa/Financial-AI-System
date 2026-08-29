@@ -7,7 +7,6 @@ from langchain_core.messages import HumanMessage
 # from langchain_mistralai import ChatMistralAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from backend.config import settings
 from backend.core.rag.adaptive_rag import route_financial_query, RouteQuery
 from backend.core.rag.self_rag import check_quality, QualityCheck
 from backend.core.rag.corrective_rag import verify_facts
@@ -162,7 +161,7 @@ def generate_answer_node(state: GraphState) -> dict:
         
         context = "\n\n---\n\n".join([f"Source: {doc['source']}\nContent: {doc['content']}" for doc in documents])
         
-        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.5, api_key=settings.GOOGLE_API_KEY)
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.5, api_key=state["google_api_key"])
         
         system_message = (
             "You are a financial data analyst AI. Your ONLY task is to answer a user's question based *strictly* on the data provided. You are forbidden from using any external knowledge. If the data is not present in the given document, you must state that the information is not available in the provided data. \n\n"
