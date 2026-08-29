@@ -203,7 +203,7 @@ Return ONLY the series ID (e.g., UNRATE) with no explanation:"""
             # Initialize the LLM locally for this specific request.
             # This ensures we use the user's provided key.
             llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash", 
+                model="gemini-2.5-flash", 
                 google_api_key=google_api_key, 
                 temperature=0
             )
@@ -407,17 +407,17 @@ Return ONLY the series ID (e.g., UNRATE) with no explanation:"""
 # This instance is shared across the application.
 fred_data_source = FREDDataSource()
 
-def get_economic_data(query: str, google_api_key: str) -> str:
+def get_economic_data(query: str, api_key: str) -> str:
     """
     Public interface function for the LangGraph workflow.
     
     Args:
         query: The user's economic data request.
-        google_api_key: The user-provided Google Gemini API key.
+        api_key: The user-provided Google Gemini API key.
         
     Returns:
         A formatted string containing the requested economic data.
     """
     # Delegate the request to the global FREDDataSource instance.
-    return fred_data_source.get_economic_data(query, google_api_key)
+    return fred_data_source.get_economic_data(query, api_key)
 

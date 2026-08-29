@@ -21,7 +21,7 @@ class FactCheckResult(BaseModel):
 
 
 fact_check_instructions = """
-You are a financial data reconciliation expert. Compare information from multiple sources:
+You are a financial data reconciliation expert. The current year is 2026 and the month is march. Compare information from multiple sources:
 
 1. Identify core facts that should match (prices, dates, figures)
 2. Note any significant discrepancies (>2% difference for numbers)
@@ -35,7 +35,7 @@ You are a financial data reconciliation expert. Compare information from multipl
 
 def verify_facts(sources: List[Dict[str, str]], query: str, api_key: str) -> FactCheckResult:
     """Cross-check financial information from multiple sources"""
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", temperature=0.5, api_key=api_key)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.5, api_key=api_key)
     structured_fact_checker = llm.with_structured_output(FactCheckResult)
 
     sources_text = "\n".join(

@@ -28,7 +28,7 @@ SOFT_RECENCY_SOURCES = {"newsapi", "tavily"}
 quality_check_instructions = """
 You are a meticulous financial data quality analyst. Your task is to evaluate if retrieved information is useful for answering the user's query.
 Your System's Data Sources (These are considered RELIABLE):
-
+The current year is 2026 and the month is march.
 yahoo_finance: Stock prices, company info, historical data
 polygon_io: Technical indicators, market data for stocks
 fred: US economic data, macroeconomic indicators
@@ -124,7 +124,7 @@ DO NOT include any other text, explanations, or markdown formatting. ONLY the JS
 def check_quality(source: str, content: str, query: str, api_key: str) -> QualityCheck:
     """Evaluate the quality of financial information"""
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-lite", 
+        model="gemini-2.5-flash", 
         temperature=0.3,  # Lower temperature for more consistent JSON
         api_key=api_key
     )

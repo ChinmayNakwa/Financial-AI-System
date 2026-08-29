@@ -78,7 +78,7 @@ def calculate_macd(data, fast=12, slow=26, signal=9):
 
 def get_technical_indicators(query: str, api_key: str) -> str:
     ticker = None
-    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", api_key=api_key)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key)
     try:
         ticker_info = extract_financial_entities(query, api_key)
         if ticker_info and ticker_info.get('tickers'):
