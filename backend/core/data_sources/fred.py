@@ -203,7 +203,7 @@ Return ONLY the series ID (e.g., UNRATE) with no explanation:"""
             # Initialize the LLM locally for this specific request.
             # This ensures we use the user's provided key.
             llm = ChatGoogleGenerativeAI(
-                model="gemini-3.7-flash", 
+                model="gemini-3.5-flash-lite", 
                 google_api_key=google_api_key, 
                 temperature=0
             )

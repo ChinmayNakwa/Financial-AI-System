@@ -22,7 +22,7 @@ User Question: "{prompt}"
 
 Return only a comma-separated list of tickers.
 """
-    google_client = ChatGoogleGenerativeAI(model="gemini-3.7-flash", api_key=api_key)
+    google_client = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", api_key=api_key)
     chat_prompt = ChatPromptTemplate.from_template(instrument_prompt)
     response = google_client.generate(
         [{"role": "user", "content": chat_prompt.format()}]
