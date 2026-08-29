@@ -1,8 +1,9 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 
-import requests 
+import requests
 from backend.config import settings
+from backend.core.llm_utils import llm_text
 from datetime import datetime
 
 coindesk_api_key = settings.COINDESK_API_KEY
@@ -24,25 +25,15 @@ Return only a comma-separated list of tickers.
 """
     google_client = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", api_key=api_key)
     chat_prompt = ChatPromptTemplate.from_template(instrument_prompt)
-    response = google_client.generate(
-        [{"role": "user", "content": chat_prompt.format()}]
-    )
-
-    try:
-        gen = response.generations
-        if isinstance(gen, list) and gen and isinstance(gen[0], list):
-            instruments_text = gen[0][0].text
-        else:
-            instruments_text = gen[0].text
-    except Exception:
-        instruments_text = str(response)
+    response = google_client.invoke(chat_prompt.format_messages())
+    instruments_text = llm_text(response)
 
     return [i.strip().upper() for i in instruments_text.split(",") if i.strip()]
 
 
-def get_latest_tick_data(prompt: str) -> str:
+def get_latest_tick_data(prompt: str, api_key: str) -> str:
     try:
-        instruments = get_instruments(prompt)
+        instruments = get_instruments(prompt, api_key)
         if not instruments:
             return "Could not identify any cryptocurrency instruments in the query."
 
