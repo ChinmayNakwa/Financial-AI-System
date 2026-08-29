@@ -6,6 +6,7 @@ import yfinance as yf
 import re
 import json
 from backend.config import settings
+from backend.core.llm_utils import llm_text
 import pandas as pd
 from datetime import datetime, timedelta
 
@@ -113,7 +114,7 @@ def extract_financial_entities(query: str, api_key: str) -> dict:
         
         chat_prompt = ChatPromptTemplate.from_template(prompt_text)
         response = google_client.invoke(chat_prompt.format_messages(query=query))
-        content = response.content
+        content = llm_text(response)
         
         # Debug: Print raw response
         print(f"[DEBUG] Raw Gemini response: {content}")

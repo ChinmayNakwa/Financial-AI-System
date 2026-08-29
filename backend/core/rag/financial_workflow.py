@@ -7,6 +7,7 @@ from langchain_core.messages import HumanMessage
 # from langchain_mistralai import ChatMistralAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 
+from backend.core.llm_utils import llm_text
 from backend.core.rag.adaptive_rag import route_financial_query, RouteQuery
 from backend.core.rag.self_rag import check_quality, QualityCheck
 from backend.core.rag.corrective_rag import verify_facts
@@ -177,18 +178,8 @@ def generate_answer_node(state: GraphState) -> dict:
         prompt = f"{system_message}\n\nCONTEXT:\n\n{context}\n\nBased on the context above, please answer the following question: {question}"
         
         response = llm.invoke([HumanMessage(content=prompt)])
-        
-        content = response.content
-        if isinstance(content, str):
-            # If it's already a string, use it directly
-            answer_text = content
-        elif isinstance(content, list) and len(content) > 0:
-            # If it's a list, extract the text from the first element
-            answer_text = content[0]['text']
-        else:
-            answer_text = str(content)
-        
-        return {"final_answer": answer_text}
+
+        return {"final_answer": llm_text(response)}
         
     
     except Exception as e:
